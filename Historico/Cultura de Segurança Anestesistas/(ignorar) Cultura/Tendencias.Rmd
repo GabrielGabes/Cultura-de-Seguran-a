@@ -1,0 +1,154 @@
+```{r ANALISE DE TENDENCIA: FUNÇÃO GRAFICOS LINHA + JITTER + BOXPLOT}
+df$acreditacao <- factor(df$acreditacao, levels = c('AH','NAH'))
+
+analise_grafica = function(coluna, titulo){
+  df_filter1 = df %>% filter(acreditacao == 'AH')
+  df_filter2 = df %>% filter(acreditacao == 'NAH')
+  #p1 = retorne_p_ajust(retorne_p(summary(lm(df_filter1[[coluna]]~Ano, data=df_filter1))$coefficients[2, "Pr(>|t|)"]))
+  p1 = retorne_p_ajust(retorne_p(summary(lmer(df_filter1[[coluna]] ~ Ano + (1 | Unidade), data = df_filter1))$coefficients[2, "Pr(>|t|)"]))
+  p1 = paste0('AH (', p1, ')')
+  
+  
+  #p2 = retorne_p_ajust(retorne_p(summary(lm(df_filter2[[coluna]]~Ano, data=df_filter2))$coefficients[2, "Pr(>|t|)"]))
+  p2 = retorne_p_ajust(retorne_p(summary(lmer(df_filter2[[coluna]] ~ Ano + (1 | Unidade), data = df_filter2))$coefficients[2, "Pr(>|t|)"]))
+  p2 = paste0('NAH (', p2, ')')
+  subtitulo = paste0(p1, ";  ", p2)
+  
+  ggplot() +
+    geom_jitter(data=df, aes(x=Ano, y=df[[coluna]], color=as.factor(Ano)), 
+                alpha=0.5, size=2.5, position=position_jitter(0.25)) + 
+    geom_boxplot(data=df, aes(x=Ano, y=df[[coluna]], color=as.factor(Ano)), 
+                 alpha=0.5, fill = 'white') + 
+    geom_smooth(data=df, aes(x=Ano, y=df[[coluna]]), method = lm, color = "black") + 
+    facet_grid(acreditacao~.) + 
+    scale_x_continuous(breaks=seq(from=min(df$Ano), to=max(df$Ano), by=1)) +
+    scale_y_continuous(breaks=seq(from=as.integer(min(df[[coluna]])), 
+                                  to=as.integer(max(df[[coluna]])), 
+                                  by=as.integer((max(df[[coluna]]) - min(df[[coluna]]))/6))) +
+    theme(axis.title=element_text(size=9), 
+          legend.position = "none", axis.line = element_line(colour = "black")) +
+    theme_bw() + theme(legend.position="none") + 
+    labs(subtitle=subtitulo, title=adicionar_quebra_de_linha(titulo, 38), y='Score (%)', x='Year')
+}
+```
+
+```{r}
+rround2 = function(valor, digitos, ativador){
+  valor2 = formatC(abs(valor), format = "f", digits = digitos)
+  valor2 = as.character(valor2)
+  if (valor < 0){
+    paste0("- ", valor2)
+  }
+  else{
+    if (ativador == "T"){
+      paste0(" + ", valor2)
+    }
+    else{valor2}
+  }
+}
+```
+
+
+```{r Equações LM simples}
+fd <- data.frame(Variable = character(0),
+                 "Geral" = character(0), "P_Valor_G" = character(0),
+                 "NAH" = character(0), "P_Valor_0" = character(0),
+                 "AH" = character(0), "P_Valor_1" = character(0))
+
+for (coluna in lista){
+  if (class(df[[coluna]]) == "numeric"){
+    print(coluna)
+    #GERAL ===================================================
+    print("1")
+    modelo = lm(df[[coluna]]~Ano, data=df)
+    
+    pvalor1 = summary(modelo)$coefficients[2, "Pr(>|t|)"]
+    pvalor1 = retorne_p(pvalor1)
+    
+    coeficientes = coef(modelo)
+    equacao1 = paste0("y = ", rround2(coeficientes[1],2,"F"), rround2(coeficientes[2],2,"T"), "X")
+  
+    #NÃO ACREDITADO ===================================================
+    print("2")
+    df_filter = df %>% filter(acreditacao == "NAH")
+    modelo = lm(df_filter[[coluna]]~Ano, data=df_filter)
+    
+    pvalor2 = summary(modelo)$coefficients[2, "Pr(>|t|)"]
+    pvalor2 = retorne_p(pvalor2)
+    
+    coeficientes_0 = coef(modelo)
+    equacao2 = paste0("y = ", rround2(coeficientes_0[1],2,"F"), rround2(coeficientes_0[2],2,"T"), "X")
+    
+    #ACREDITADO ===================================================
+    print("3")
+    df_filter = df %>% filter(acreditacao == "AH")
+    modelo = lm(df_filter[[coluna]]~Ano, data=df_filter)
+    
+    pvalor3 = summary(modelo)$coefficients[2, "Pr(>|t|)"]
+    pvalor3 = retorne_p(pvalor3)
+    
+    coeficientes_1 = coef(modelo)
+    equacao3 = paste0("y = ", rround2(coeficientes_1[1],2,"F"), rround2(coeficientes_1[2],2,"T"), "X")
+    
+    fd[nrow(fd)+1, ] = c(coluna, 
+                         equacao1, pvalor1,
+                         equacao2, pvalor2,
+                         equacao3, pvalor3)
+  }
+}
+
+fd %>% capture()
+```
+
+```{r Equações LM Mixed Model}
+fd <- data.frame(Variable = character(0),
+                 "Geral" = character(0), "P_Valor_G" = character(0),
+                 "NAH" = character(0), "P_Valor_0" = character(0),
+                 "AH" = character(0), "P_Valor_1" = character(0))
+
+for (coluna in lista){
+  if (class(df[[coluna]]) == "numeric"){
+    print(coluna)
+    #GERAL ===================================================
+    print("1")
+    modelo = lmer(df[[coluna]] ~ Ano + (1 | Unidade), data = df)
+    
+    pvalor1 = summary(modelo)$coefficients[2, "Pr(>|t|)"]
+    pvalor1 = retorne_p(pvalor1)
+    
+    coeficientes = coef(modelo)
+    equacao1 = paste0("y = ", rround2(modelo@beta[1],2,"F"), rround2(modelo@beta[2],2,"T"), "X")
+  
+    #NÃO ACREDITADO ===================================================
+    print("2")
+    df_filter = df %>% filter(acreditacao == "NAH")
+    #modelo = lm(df_filter[[coluna]]~Ano, data=df_filter)
+    modelo = lmer(df_filter[[coluna]] ~ Ano + (1 | Unidade), data = df_filter)
+    
+    pvalor2 = summary(modelo)$coefficients[2, "Pr(>|t|)"]
+    pvalor2 = retorne_p(pvalor2)
+    
+    coeficientes_0 = coef(modelo)
+    equacao2 = paste0("y = ", rround2(modelo@beta[1],2,"F"), rround2(modelo@beta[2],2,"T"), "X")
+    
+    #ACREDITADO ===================================================
+    print("3")
+    df_filter = df %>% filter(acreditacao == "AH")
+    modelo = lmer(df_filter[[coluna]] ~ Ano + (1 | Unidade), data = df_filter)
+    
+    pvalor3 = summary(modelo)$coefficients[2, "Pr(>|t|)"]
+    pvalor3 = retorne_p(pvalor3)
+    
+    coeficientes_1 = coef(modelo)
+    equacao3 = paste0("y = ", rround2(modelo@beta[1],2,"F"), rround2(modelo@beta[2],2,"T"), "X")
+    
+    fd[nrow(fd)+1, ] = c(coluna, 
+                         equacao1, pvalor1,
+                         equacao2, pvalor2,
+                         equacao3, pvalor3)
+  }
+}
+
+fd %>% capture()
+```
+

@@ -1,0 +1,241 @@
+```{r}
+pasta = 'C:/Users/gabri/OneDrive/Documentos/Anestesia - CMA/Cultura de Segurança/2 - Tabelas com Escores Anuais/'
+arquivo = '0 - Dados_Limpos_estudo_de_coorte.xlsx'
+caminho =  file.path(pasta, arquivo)
+df = read_excel(caminho)
+
+df = df#[sample(nrow(df), 500), ]
+dim(df)
+
+df = df %>% filter(Ano == 2022)
+df = na.omit(df)
+
+df$Ano = NULL
+df$Unidade = NULL
+df[['Qual é sua principal área ou unidade neste hospital?']] = NULL
+df$Cargo = NULL
+
+df[["SEÇÃO G2: Notificou algum evento nos ultimos 12 meses"]] = ifelse(df[["SEÇÃO G2: Notificou algum evento nos ultimos 12 meses"]] == 1, '0notificou', '1n_notificou')
+
+df[["SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?"]] = NULL
+ df[["SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?_0. Nenhuma notificações de eventos"]] = NULL
+ df[["SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?_1. 1 a 2 notificações de eventos"]] = NULL
+ df[["SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?_2. 3 a 5 notificações de eventos"]] = NULL
+ df[["SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?_3. 6 a 10 notificações de eventos"]] = NULL
+ df[["SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?_4. 11 a 20 notificações de eventos"]] = NULL
+ df[["SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?_5. 21 notificações de eventos ou mais"]] = NULL
+#sort(names(df))
+
+df$`Nota Geral` = df$`Nota Geral` %>% as.factor()# %>% levels()
+
+df$Nota_Geral_num = factor(df$`Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar.`, labels = c(0:4))
+df$Nota_Geral_num = df$Nota_Geral_num %>% as.numeric()
+df$Nota_Geral_num = df$Nota_Geral_num - 1
+df$Nota_Geral_num %>% table()
+
+################################################
+dim(df)
+head(df)
+```
+
+
+```{r}
+#names(df)
+```
+
+```{r}
+
+lista = c('24. Os funcionários falam voluntariamente se vêem algo que possa afetar negativamente o atendimento aos pacientes',
+         '26. Os funcionários sentem-se à vontade para questionar decisões ou ações dos que têm mais autoridade',
+         '28. Os funcionários têm receio de perguntar quando algo não parece certo')
+df[['Abertura de comunicação']] = rowMeans(df[lista], na.rm = TRUE)
+
+lista = c('23. Recebemos feedback das mudanças implementadas com base nos eventos notificados',
+         '25. Somos informados sobre os erros que acontecem nesta unidade',
+         '27. Nesta unidade, discutimos maneiras de impedir que os erros tornem a acontecer')
+df[['Feedback e comunicação sobre erros']] = rowMeans(df[lista], na.rm = TRUE)
+
+lista = c('29. Quando acontece um erro, mas ele é identificado e corrigido antes de afetar o paciente, com que frequência é notificado?',
+         '30. Quando acontece um erro, mas que não tem potencial de dano ao paciente, com que frequência é notificado?',
+         '31. Quando acontece um erro que poderia prejudicar o paciente, mas isto não ocorreu, com que frequência é notificado?')
+df[['Frequência de eventos relatados']] = rowMeans(df[lista], na.rm = TRUE)
+
+lista = c('32. A administração do hospital cria um ambiente de trabalho que promove a segurança do paciente',
+         '39. As ações da administração do hospital mostram que a segurança do paciente é uma prioridade máxima',
+         '40. A administração do hospital parece se interessar pela segurança do paciente apenas quando acontece um evento adverso')
+df[['Apoio de gestão hospitalar para segurança do paciente']] = rowMeans(df[lista], na.rm = TRUE)
+
+lista = c('33. As unidades hospitalares não se coordenam bem entre si.',
+         '35. Existe uma boa cooperação entre as unidades hospitalares que precisam trabalhar juntas',
+         '37. Muitas vezes é desagradável trabalhar unidades com funcionários de outras unidades do hospital',
+         '41. As unidades do hospital trabalham bem juntas para prestar o melhor atendimento aos pacientes')
+df[['Trabalho em equipe entre as unidades hospitalares']] = rowMeans(df[lista], na.rm = TRUE)
+
+lista = c('1. As pessoas se apoiam umas às outras nesta unidade',
+         '3. Quando há muito trabalho a ser feito e rapidamente, trabalhamos juntos em equipe para realizar a tarefa',
+         '4. Nesta unidade, as pessoas se tratam com respeito',
+         '11. Quando uma área nesta unidade fica muito movimentada, as demais ajudam')
+df[['Trabalho em equipe no âmbito das unidades']] = rowMeans(df[lista], na.rm = TRUE)
+
+lista = c('34. Coisas "escapam por entre os dedos” quando os pacientes são transferidos de uma unidade para outra',
+         '36. Importantes informações sobre a assistência se perdem durante as mudanças de turno',
+         '38. Os problemas com frequência ocorrem na troca de informações entre as unidades do hospital',
+         '42. As mudanças de turno são problemáticas para os pacientes deste Hospital')
+df[['Transferências internas e passagens de plantão']] = rowMeans(df[lista], na.rm = TRUE)
+
+lista = c('6. Estamos ativamente buscando melhorias para a segurança do paciente',
+         '9. Erros que ocorreram levaram a mudanças positivas nesta unidade',
+         '13. Quando fazemos mudanças para melhorar a segurança do paciente, nós avaliamos sua efetividade')
+df[['Aprendizado organizacional - melhoria contínua']] = rowMeans(df[lista], na.rm = TRUE)
+
+lista = c('19. Meu supervisor/gerente elogia quando vê um trabalho feito de acordo com os procedimentos estabelecidos para a segurança do paciente.',
+         '20. Meu supervisor/gerente considera seriamente as sugestões dos funcionários para melhorar a segurança do paciente',
+         '21. Sempre que a pressão aumenta, meu supervisor/gerente quer que trabalhemos mais rápido, mesmo que isto signifique tomar atalhos',
+         '22. Meu supervisor/gerente ignora problemas recorrentes na segurança do paciente')
+df[['Expectativas de promoção da segurança dos supervisores e gerentes']] = rowMeans(df[lista], na.rm = TRUE)
+
+lista = c('10. É apenas por acaso que erros mais sérios não acontecem por aqui',
+         '15. A segurança do paciente nunca é sacrificada em prol de se trabalhar mais',
+         '17. Temos problemas com a segurança do paciente nesta unidade',
+         '18. Nossos procedimentos e sistemas são bons para impedir que os erros aconteçam')
+df[['Percepção gerais sobre segurança']] = rowMeans(df[lista], na.rm = TRUE)
+
+lista = c('8. Os funcionários sentem que seus erros são usados contra eles',
+         '12. Quando um evento é notificado, sentimos que o foco se concentra no indivíduo, e não no problema',
+         '16. Os funcionários se preocupam que seus erros sejam registrados em seu arquivo funcional')
+df[['Respostas não punitivas aos erros']] = rowMeans(df[lista], na.rm = TRUE)
+
+lista = c('2. Temos pessoas suficientes para lidar com o volume de trabalho',
+         '5. Os funcionários desta unidade trabalham mais horas do que o recomendado no atendimento a pacientes',
+         '7. Utilizamos mais funcionários temporários do que o recomendado no atendimento a paciente',
+         '14. Trabalhamos “em modo de crise”, tentando fazer coisas demais, rápido demais')
+df[['Staffing']] = rowMeans(df[lista], na.rm = TRUE)
+
+#names(df)
+
+```
+
+
+```{r Arrumando Tipos}
+df$controle = sample(c(0,1), nrow(df), replace=T)
+
+for (coluna in names(df)){
+  classe = df[[coluna]] %>% class()
+  qtd_levels = df[[coluna]] %>% as.factor() %>% levels() %>% length()
+  
+  if (qtd_levels == 2){
+    leveis = df[[coluna]] %>% as.factor() %>% levels()
+    if (leveis[1] == '0notificou' & leveis[2] == '1n_notificou'){
+      df[[coluna]] = factor(df[[coluna]])
+    } else {
+      df[[coluna]] = factor(df[[coluna]], labels=c('No','Yes'))
+    }
+    #print(coluna)
+  }
+}
+
+df_backup = df
+```
+
+# Analise Univariada
+
+```{r Tabelas e testes de hipotese}
+coluna_analisada = 'SEÇÃO G2: Notificou algum evento nos ultimos 12 meses'
+
+colunas = names(df)
+colunas = colunas[!colunas %in% c(coluna_analisada)]
+
+tabelona = conti(df, "controle", coluna_analisada)[FALSE, ]
+
+for (coluna in colunas){
+  classe = class(df[[coluna]])[1]
+  if (classe == "numeric"){
+    if (normalidade_por_grupo_criterio(df, coluna, coluna_analisada)){
+      tabelinha = summary_numerico_por_grupo_parametrico(df, coluna, coluna_analisada)
+    } else {
+      tabelinha = summary_numerico_por_grupo_n_parametrico(df, coluna, coluna_analisada)
+    }
+  }
+  else if (classe == 'character' | classe == 'factor' | classe == 'logical'){
+    tabelinha = conti(df, coluna_analisada, coluna, "col")
+  }
+  tabelona = rbind(tabelona, tabelinha)
+}
+colnames(tabelona)[colnames(tabelona) == "Overall"] = paste0("Overall 100% (n=", nrow(df[complete.cases(df[[coluna_analisada]]), ]), ")")
+niveis = levels(as.factor(df[[coluna_analisada]]))
+for (i in 1:length(niveis)){
+  nivel = niveis[i]
+  
+  table_d = table( df[[coluna_analisada]] )
+  prob_table = prop.table( table_d ) %>% round(4) * 100
+  
+  colnames(tabelona)[colnames(tabelona) == nivel] = paste0(nivel, ' ', prob_table[i], "% (n=", table_d[i], ")")
+}
+tabelona %>% capture()
+
+```
+
+```{r Odds Ratio}
+####################################################################################
+
+tabelona = analise_mod(glm(df[[coluna_analisada]]~df[['controle']], family='binomial'))
+
+tabelona$indice = NA
+tabelona = tabelona[, c("indice", setdiff(names(tabelona), "indice"))]
+tabelona = tabelona[FALSE, ]
+
+for (coluna in colunas){
+  tabelinha = analise_mod(glm(df[[coluna_analisada]]~df[[coluna]], family='binomial'))
+  
+  tabelinha$indice = row.names(tabelinha)
+  tabelinha = tabelinha[, c("indice", setdiff(names(tabelinha), "indice"))]
+  
+  row.names(tabelinha) = 1:nrow(tabelinha)
+  
+  if (class(df[[coluna]]) != "numeric"){
+    tabelinha = rbind(NA,NA, tabelinha)
+    tabelinha[["indice"]] = c(coluna,levels(as.factor(df[[coluna]])))
+  }
+  else{
+    tabelinha[["indice"]] = coluna
+  }
+  tabelona = rbind(tabelona, tabelinha)
+}
+tabelona$`Pr(>|z|)` = sapply(tabelona$`Pr(>|z|)`, function(x) ifelse(is.na(x), NA, retorne_p(x)))
+tabelona$OR = paste0( tabelona$OR, ' (', tabelona$`2.5 %`, ' - ', tabelona$`97.5 %`, ')' )
+tabelona$OR[tabelona$OR == 'NA (NA - NA)'] = NA
+tabelona$`2.5 %` = NULL
+tabelona$`97.5 %` = NULL
+tabelona$indice = NULL
+tabelona %>% capture()
+```
+
+```{r}
+df_backup = df
+```
+
+```{r}
+df = df_backup
+```
+
+
+```{r}
+names(df)
+```
+
+
+```{r}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,176 @@
+
+```{r}
+setwd("C:/Users/Gabriel/Onedrive/Documentos/CULTURA DE SEGURANÇA")
+df <- read_excel("4 - Dados_Score_Ano_vs_Acreditacao_vs_Unidade.xlsx")
+
+df$acreditacao = ifelse(df$acreditacao == 1, 'AH', 'NAH')
+df$acreditacao <- factor(df$acreditacao, levels = c('NAH', 'AH'))
+df$acreditacao = as.factor(df$acreditacao)
+
+grafi = df %>% group_by(Ano, acreditacao) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 2)) %>% ungroup()
+
+capture(grafi)
+
+ggplot(grafi, aes(as.factor(Ano), n, label=n, fill=as.factor(acreditacao))) + 
+  geom_col(show.legend = FALSE, color="black", alpha=0.90) + facet_grid(~acreditacao) +
+  geom_text(aes(y=n, label = n, vjust=-0.1)) + labs(x="Year", title="Number of hospitals") +
+  theme(axis.title=element_text(size=9), 
+          legend.position = "none", axis.line = element_line(colour = "black")) +
+  theme_bw() +
+  scale_y_continuous(breaks=seq(from = 0, 
+                                  to = 60, 
+                                  by = 5,
+                       limits = c(0, 60)))
+
+ggsave("Agrupamentos2.png", height=10, width=20, units="cm", dpi=600)
+```
+```{r}
+df_progresso = df %>% filter(passou_a_ser_acreditado == 1)
+df_pareado = df_progresso %>% group_by(Unidade, acreditacao) %>% summarise(score = median(Staffing))
+df_pareado
+t.test(score~acreditacao, data=df_pareado, paired=T) 
+```
+
+```{r}
+setwd("C:/Users/Gabriel/OneDrive/Documentos/CULTURA DE SEGURANÇA")
+df <- read_excel("0 - Dados Limpos.xlsx")
+df$acreditacao = ifelse(df$acreditacao == 1, "Accreditation", "No Accreditation")
+df$acreditacao <- factor(df$acreditacao, levels = c('No Accreditation', 'Accreditation'))
+```
+
+```{r}
+df$variavel_entrada = df$`SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?`
+conti(df,"acreditacao","variavel_entrada") %>% capture()
+#Grafico de barra (variavel: categorica vs categorica) ====================================================================================
+grafi = df %>% filter(!is.na(variavel_entrada)) %>% 
+  group_by(acreditacao, variavel_entrada) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 2)) %>% ungroup()
+grafi$acreditacao <- factor(grafi$acreditacao, levels = c('No Accreditation', 'Accreditation'))
+levels(as.factor(grafi$variavel_entrada))
+grafi$variavel_entrada[grafi$variavel_entrada == "0. Nenhuma notificações de eventos"] = "0"
+grafi$variavel_entrada[grafi$variavel_entrada == "1. 1 a 2 notificações de eventos"] = "1 - 2"
+grafi$variavel_entrada[grafi$variavel_entrada == "2. 3 a 5 notificações de eventos"] = "3 - 5"
+grafi$variavel_entrada[grafi$variavel_entrada == "3. 6 a 10 notificações de eventos"] = "6 - 10"
+grafi$variavel_entrada[grafi$variavel_entrada == "4. 11 a 20 notificações de eventos"] = "11 - 20"
+grafi$variavel_entrada[grafi$variavel_entrada == "5. 21 notificações de eventos ou mais"] = "≥ 21"
+grafi$variavel_entrada <- factor(grafi$variavel_entrada, levels = c("0","1 - 2","3 - 5","6 - 10","11 - 20","≥ 21"))
+
+ggplot(grafi, aes(as.factor(variavel_entrada), Freq, label= scales::percent(Freq), fill=as.factor(acreditacao))) + 
+  geom_col(color="black", position="dodge", width = 0.9) +
+  geom_text(aes(y = Freq), position = position_dodge(width = 0.9), vjust=-0.1) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(legend.position = "top") +
+  theme(plot.title = element_text(face='italic'), axis.title = element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="Numbers", title="Number of employee event notifications", fill = "",
+       subtitle = paste0("P-Valor (Qui-Quadrado) = ", retorne_p(chisq.test(df$acreditacao, df$variavel_entrada)$p.value)))
+ggsave("Numero_notificacoes.png", height=10, width=15, units="cm", dpi= 600)
+```
+
+```{r}
+df$variavel_entrada = df$Cargo
+levels(as.factor(df$variavel_entrada))
+df$variavel_entrada[df$variavel_entrada == "Tecnico Enfermeiro"] = "Tecnico de Enfermeiro"
+grafi = df %>% filter(!is.na(variavel_entrada)) %>% 
+  group_by(variavel_entrada) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 2)) %>% ungroup()
+
+levels(as.factor(grafi$variavel_entrada))
+grafi$variavel_entrada[grafi$variavel_entrada == "Enfermeiro"] = "Nurse"
+grafi$variavel_entrada[grafi$variavel_entrada == "Tecnico de Enfermeiro"] = "Nursing technician"
+grafi$variavel_entrada[grafi$variavel_entrada == "Outros"] = "Others"
+grafi$variavel_entrada[grafi$variavel_entrada == "Médico"] = "Doctor"
+grafi$variavel_entrada <- factor(grafi$variavel_entrada, levels = c("Doctor","Nurse","Nursing technician","Others"))
+
+ggplot(grafi, aes(x = variavel_entrada, y = n, fill=variavel_entrada)) +
+  geom_bar(stat = "identity",color="black") +
+  theme_bw() + theme(legend.position = "none") +
+  # Adicionando rótulos com contagem e porcentagem
+  geom_text(aes(label = paste0(n, " (", Freq*100, "%)")), vjust = -0.5, size = 3.5) +
+  labs(x="Office", y="n", fill='') +
+  scale_y_continuous(breaks=seq(from = 0, 
+                                  to = 90000, 
+                                  by = 10000,
+                       limits = c(0, 87000)))
+ggsave("Numero_notificacoes.png", height=12, width=17, units="cm", dpi= 600)
+
+
+```
+
+```{r}
+df$variavel_entrada = df$`Qual é sua principal área ou unidade neste hospital?`
+levels(as.factor(df$variavel_entrada))
+#df$variavel_entrada[df$variavel_entrada == "Tecnico Enfermeiro"] = "Tecnico de Enfermeiro"
+grafi = df %>% filter(!is.na(variavel_entrada)) %>% 
+  group_by(variavel_entrada) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 2)) %>% ungroup()
+grafi
+
+grafi$variavel_entrada[grafi$variavel_entrada == "Administrativa"] = "Administrative"
+grafi$variavel_entrada[grafi$variavel_entrada == "Anestesiologia"] = "Anesthesiology"
+grafi$variavel_entrada[grafi$variavel_entrada == "Cardiologia Intervencionistas"] = "Interventional Cardiology"
+grafi$variavel_entrada[grafi$variavel_entrada == "Central de Material Esterilizado"] = "Sterile Material Center"
+grafi$variavel_entrada[grafi$variavel_entrada == "Centro Cirúrgico"] = "Surgery Center"
+grafi$variavel_entrada[grafi$variavel_entrada == "Centro Obstétrico"] = "Obstetric Center"
+grafi$variavel_entrada[grafi$variavel_entrada == "Diretoria"] = "Board"
+grafi$variavel_entrada[grafi$variavel_entrada == "Emergência adulto"] = "Adult emergency"
+grafi$variavel_entrada[grafi$variavel_entrada == "Emergência ginecologia"] = "Gynecological emergency"
+grafi$variavel_entrada[grafi$variavel_entrada == "Emergência pediátrica"] = "Pediatric Emergency"
+grafi$variavel_entrada[grafi$variavel_entrada == "Endoscopia"] = "Endoscopy"
+grafi$variavel_entrada[grafi$variavel_entrada == "Farmácia"] = "Pharmacy"
+grafi$variavel_entrada[grafi$variavel_entrada == "Gerência"] = "Management"
+grafi$variavel_entrada[grafi$variavel_entrada == "Laboratório Clínico"] = "Clinical laboratory"
+grafi$variavel_entrada[grafi$variavel_entrada == "Maternidade"] = "Maternity"
+grafi$variavel_entrada[grafi$variavel_entrada == "Nutrição"] = "Nutrition"
+grafi$variavel_entrada[grafi$variavel_entrada == "Pediatria"] = "Pediatrics"
+grafi$variavel_entrada[grafi$variavel_entrada == "Psiquiatria/Saúde mental"] = "Psychiatry/Mental health"
+grafi$variavel_entrada[grafi$variavel_entrada == "Radiologia"] = "Radiology"
+grafi$variavel_entrada[grafi$variavel_entrada == "Reabilitação"] = "Rehabilitation"
+grafi$variavel_entrada[grafi$variavel_entrada == "Ressonância Magnética"] = "Magnetic Resonance"
+grafi$variavel_entrada[grafi$variavel_entrada == "Suprimentos"] = "Supplies"
+grafi$variavel_entrada[grafi$variavel_entrada == "Ultrassonografia"] = "Ultrasonography"
+grafi$variavel_entrada[grafi$variavel_entrada == "Unidade de Internação adulto"] = "Adult Inpatient Unit"
+grafi$variavel_entrada[grafi$variavel_entrada == "Unidade de Internação neonatal/ berçário"] = "Neonatal Inpatient Unit/ Nursery"
+grafi$variavel_entrada[grafi$variavel_entrada == "Unidade de Internação pediátrica"] = "Pediatric Inpatient Unit"
+grafi$variavel_entrada[grafi$variavel_entrada == "Unidade de terapia intensiva adulto"] = "Adult Intensive Care Unit"
+grafi$variavel_entrada[grafi$variavel_entrada == "Unidade de terapia intensiva neonatal"] = "Neonatal intensive care unit"
+grafi$variavel_entrada[grafi$variavel_entrada == "Unidade de terapia intensiva pediátrica"] = "Pediatric intensive care unit"
+
+
+#grafi$variavel_entrada <- factor(grafi$variavel_entrada, levels = c("Doctor","Nurse","Nursing technician","Others"))
+
+ggplot(grafi, aes(y = variavel_entrada, x = n, fill=variavel_entrada)) +
+  geom_bar(stat = "identity",color="black") +
+  theme_bw() + theme(legend.position = "none") +
+  # Adicionando rótulos com contagem e porcentagem
+  geom_text(aes(label = paste0(n, " (", Freq*100, "%)")), hjust = -0.1, size = 3.5) +
+  labs(y="Office", x="n", fill='') +
+  scale_x_continuous(breaks=seq(from = 0, 
+                                  to = 38000, 
+                                  by = 5000),
+                                limits = c(0, 38000))
+ggsave("Numero_notificacoes.png", height=25, width=25, units="cm", dpi= 600)
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+

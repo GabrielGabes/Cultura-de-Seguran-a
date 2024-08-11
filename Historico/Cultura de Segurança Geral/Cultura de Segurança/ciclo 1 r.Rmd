@@ -1,0 +1,733 @@
+```{r}
+if(!require(dplyr)) install.packages("dplyr")
+library(dplyr)                                
+if(!require(car)) install.packages("car")   
+library(car)                                
+if(!require(rstatix)) install.packages("rstatix") 
+library(rstatix)                                
+if(!require(DescTools)) install.packages("DescTools") 
+library(DescTools)
+if(!require(emmeans)) install.packages("emmeans") 
+library(emmeans)
+if(!require(ggplot2)) install.packages("ggplot2") 
+library(ggplot2)
+```
+
+
+```{r}
+library(readxl)
+df <- read_excel("C:/Users/Gabriel/Documents/CULTURA DE SEGURANÇA/tabela3.xlsx")
+df$acreditacao = ifelse(df$acreditacao == 1, "Acre", "Não Acre")
+
+table(df$Regional2, df$acreditacao)
+table(df$Regional3, df$acreditacao)
+```
+```{r}
+lista = c('1. As pessoas se apoiam umas às outras nesta unidade',
+       '2. Temos pessoas suficientes para lidar com o volume de trabalho',
+       '3. Quando há muito trabalho a ser feito e rapidamente, trabalhamos juntos em equipe para realizar a tarefa',
+       '4. Nesta unidade, as pessoas se tratam com respeito',
+       '5. Os funcionários desta unidade trabalham mais horas do que o recomendado no atendimento a pacientes',
+       '6. Estamos ativamente buscando melhorias para a segurança do paciente',
+       '7. Utilizamos mais funcionários temporários do que o recomendado no atendimento a paciente',
+       '8. Os funcionários sentem que seus erros são usados contra eles',
+       '9. Erros que ocorreram levaram a mudanças positivas nesta unidade',
+       '10. É apenas por acaso que erros mais sérios não acontecem por aqui',
+       '11. Quando uma área nesta unidade fica muito movimentada, as demais ajudam',
+       '12. Quando um evento é notificado, sentimos que o foco se concentra no indivíduo, e não no problema',
+       '13. Quando fazemos mudanças para melhorar a segurança do paciente, nós avaliamos sua efetividade',
+       '14. Trabalhamos “em modo de crise”, tentando fazer coisas demais, rápido demais',
+       '15. A segurança do paciente nunca é sacrificada em prol de se trabalhar mais',
+       '16. Os funcionários se preocupam que seus erros sejam registrados em seu arquivo funcional',
+       '17. Temos problemas com a segurança do paciente nesta unidade',
+       '18. Nossos procedimentos e sistemas são bons para impedir que os erros aconteçam',
+       '19. Meu supervisor/gerente elogia quando vê um trabalho feito de acordo com os procedimentos estabelecidos para a segurança do paciente.',
+       '20. Meu supervisor/gerente considera seriamente as sugestões dos funcionários para melhorar a segurança do paciente',
+       '21. Sempre que a pressão aumenta, meu supervisor/gerente quer que trabalhemos mais rápido, mesmo que isto signifique tomar atalhos',
+       '22. Meu supervisor/gerente ignora problemas recorrentes na segurança do paciente',
+       '23. Recebemos feedback das mudanças implementadas com base nos eventos notificados',
+       '24. Os funcionários falam voluntariamente se vêem algo que possa afetar negativamente o atendimento aos pacientes',
+       '25. Somos informados sobre os erros que acontecem nesta unidade',
+       '26. Os funcionários sentem-se à vontade para questionar decisões ou ações dos que têm mais autoridade',
+       '27. Nesta unidade, discutimos maneiras de impedir que os erros tornem a acontecer',
+       '28. Os funcionários têm receio de perguntar quando algo não parece certo',
+       '29. Quando acontece um erro, mas ele é identificado e corrigido antes de afetar o paciente, com que frequência é notificado?',
+       '30. Quando acontece um erro, mas que não tem potencial de dano ao paciente, com que frequência é notificado?',
+       '31. Quando acontece um erro que poderia prejudicar o paciente, mas isto não ocorreu, com que frequência é notificado?',
+       'Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar.',
+       '32. A administração do hospital cria um ambiente de trabalho que promove a segurança do paciente',
+       '33. As unidades hospitalares não se coordenam bem entre si.',
+       '34. Coisas "escapam por entre os dedos” quando os pacientes são transferidos de uma unidade para outra',
+       '35. Existe uma boa cooperação entre as unidades hospitalares que precisam trabalhar juntas',
+       '36. Importantes informações sobre a assistência se perdem durante as mudanças de turno',
+       '37. Muitas vezes é desagradável trabalhar unidades com funcionários de outras unidades do hospital',
+       '38. Os problemas com frequência ocorrem na troca de informações entre as unidades do hospital',
+       '39. As ações da administração do hospital mostram que a segurança do paciente é uma prioridade máxima',
+       '40. A administração do hospital parece se interessar pela segurança do paciente apenas quando acontece um evento adverso',
+       '41. As unidades do hospital trabalham bem juntas para prestar o melhor atendimento aos pacientes',
+       '42. As mudanças de turno são problemáticas para os pacientes deste Hospital')
+```
+
+```{r}
+df %>% group_by(Regional3, acreditacao) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 2)) %>% ungroup()
+```
+
+```{r}
+df$var_analisada = df[[lista[7]]]
+
+#PRESSUPOSTO DE NORMALIDADE
+df %>% group_by(Regional3, acreditacao) %>% shapiro_test(var_analisada)
+
+df %>%
+  group_by(Regional3, acreditacao) %>%
+  summarise(mean_var = mean(var_analisada, na.rm = TRUE),
+            median_var = median(var_analisada, na.rm = TRUE))
+```
+```{r}
+boxplot(df$var_analisada~df$acreditacao:df$Regional3)
+```
+
+```{r}
+leveneTest(var_analisada ~ as.factor(acreditacao)*Regional3, df, center = mean)
+```
+```{r}
+modelo <- aov(var_analisada ~ acreditacao*Regional3, df)
+summary(modelo)
+
+Anova(modelo, type='III')
+
+shapiro.test(modelo$residuals)
+boxplot(modelo$residuals)
+```
+
+
+```{r}
+df_means <- df %>%
+  group_by(acreditacao, Regional3) %>%
+  summarise(mean_var = mean(var_analisada, na.rm = TRUE))
+
+
+ggplot(df, aes(x=var_analisada, fill=as.factor(Regional3))) +
+  geom_density(position='identity', alpha =0.5) + facet_grid(Regional3~acreditacao) +
+  theme(legend.position = "bottom") + 
+  geom_vline(data = df_means, aes(xintercept = mean_var), linetype="dashed", color="red", size=1) +
+  labs(title="Density Plot with Mean Line", x='Score', y='Density', fill='')
+
+
+
+
+grafico1 = ggplot() + 
+  geom_violin(data=df, aes(x=as.factor(acreditacao), y=`Abertura de comunicação`, fill=as.factor(acreditacao)), show.legend = F) + 
+  geom_boxplot(data=df, aes(x=as.factor(acreditacao), y=`Abertura de comunicação`, fill=as.factor(acreditacao)), alpha=0.90, show.legend = F, width = 0.15, fill = 'white') + 
+  geom_errorbar(data=df, aes(x=as.factor(acreditacao), y=`Abertura de comunicação`, fill=as.factor(acreditacao)), stat = "summary", fun.data = "mean_se", width= 0.14, color="pink") +
+  geom_point(data=df, aes(x=as.factor(acreditacao), y=`Abertura de comunicação`, fill=as.factor(acreditacao)), stat = "summary", fun = "mean", show.legend = F, color="red", size=2) + 
+  annotate("text", x = 1.5, y = max(df$`Abertura de comunicação`,na.rm = T), label = retorne_p2(t.test(`Abertura de comunicação`~acreditacao, data=df)$p.value), vjust = 0.5, size = 4, color = "black") +
+  labs(y='Score', x="Abertura de comunicação") + 
+  theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic'), 
+        legend.position = "bottom",axis.line = element_line(colour = "black")) +
+  theme_bw() + 
+  scale_y_continuous(breaks=seq(from = 0, 
+                                to = max(df$`Abertura de comunicação`,na.rm = T), 
+                                by = 1), limits = c(min(df$`Abertura de comunicação`,na.rm = T), max(df$`Abertura de comunicação`,na.rm = T))) +
+  theme(axis.title.x = element_text(size = 15),
+        axis.title.y = element_text(size = 11))
+
+grafico1
+  
+```
+```{r}
+# Instale o pacote rstatix se ainda não o fez
+# install.packages("rstatix")
+
+# Carregue os pacotes necessários
+library(dplyr)
+library(rstatix)
+
+# Realize o teste de normalidade de Shapiro-Wilk por grupo
+resultados_teste <- df %>% 
+  group_by(acreditacao) %>% 
+  summarise(teste_shapiro = shapiro_test(df$`Percepção gerais sobre segurança`))
+
+
+```
+
+```{r}
+analise_grafica = function(coluna){
+  if (p1 >= 0.05 & p2 >= 0.05){
+    teste_hipo = retorne_p2(t.test(df[[coluna]]~acreditacao, data=df)$p.value)
+    titulo = paste0(coluna,"¹")
+    }
+  else{
+    teste_hipo = retorne_p2(wilcox.test(df[[coluna]]~acreditacao, data=df)$p.value)
+    titulo = paste0(coluna,"²")
+  }
+  ggplot() + 
+    geom_violin(data=df, aes(x=as.factor(acreditacao), y=df[[coluna]], fill=as.factor(acreditacao)), show.legend = F) + 
+    geom_boxplot(data=df, aes(x=as.factor(acreditacao), y=df[[coluna]], fill=as.factor(acreditacao)), alpha=0.90, show.legend = F, width = 0.5, fill = 'white') + 
+    geom_errorbar(data=df, aes(x=as.factor(acreditacao), y=df[[coluna]], fill=as.factor(acreditacao)), stat = "summary", fun.data = "mean_se", width= 0.14, color="pink") +
+    geom_point(data=df, aes(x=as.factor(acreditacao), y=df[[coluna]], fill=as.factor(acreditacao)), stat = "summary", fun = "mean", show.legend = F, color="red", size=2) + 
+    annotate("text", x = 1.5, y = max(df[[coluna]],na.rm = T), label = teste_hipo, vjust = 0.5, size = 4, color = "black") +
+    labs(y='Score', x=adicionar_quebra_de_linha(titulo)) + 
+    theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic'), 
+          legend.position = "bottom",axis.line = element_line(colour = "black")) +
+    theme_bw() + 
+    scale_y_continuous(breaks=seq(from = 0, 
+                                  to = max(df[[coluna]],na.rm = T), 
+                                  by = as.integer((max(df[[coluna]],na.rm = T) - min(df[[coluna]],na.rm = T))/10)),
+                       limits = c(min(df[[coluna]],na.rm = T), max(df[[coluna]],na.rm = T))) +
+    theme(axis.title.x = element_text(size = 13),
+          axis.title.y = element_text(size = 11))
+}
+
+(analise_grafica('Abertura de comunicação')+analise_grafica('Feedback e comunicação sobre erros')+analise_grafica('Frequência de eventos relatados'))/
+  (analise_grafica('Apoio de gestão hospitalar para segurança do paciente')+analise_grafica('Trabalho em equipe entre as unidades hospitalares')+analise_grafica('Trabalho em equipe no âmbito das unidades'))/
+  (analise_grafica('Transferências internas e passagens de plantão')+analise_grafica('Aprendizado organizacional - melhoria contínua')+analise_grafica('Expectativas de promoção da segurança dos supervisores e gerentes'))/
+  (analise_grafica('Percepção gerais sobre segurança')+analise_grafica('Respostas não punitivas aos erros')+analise_grafica('Staffing'))
+ggsave("Agrupamentos.png", height=44, width=30, units="cm", dpi= 600)
+
+#Abertura de comunicação
+analise_grafica('24. Os funcionários falam voluntariamente se vêem algo que possa afetar negativamente o atendimento aos pacientes') + analise_grafica('26. Os funcionários sentem-se à vontade para questionar decisões ou ações dos que têm mais autoridade') + analise_grafica('28. Os funcionários têm receio de perguntar quando algo não parece certo')
+ggsave("Abertura de comunicação.png", height=11, width=30, units="cm", dpi= 600)
+
+#Feedback e comunicação sobre erros
+analise_grafica('23. Recebemos feedback das mudanças implementadas com base nos eventos notificados')+analise_grafica('25. Somos informados sobre os erros que acontecem nesta unidade')+analise_grafica('27. Nesta unidade, discutimos maneiras de impedir que os erros tornem a acontecer')
+ggsave("Feedback e comunicação sobre erros.png", height=11, width=30, units="cm", dpi= 600)
+
+#Frequencia de eventos relatados
+analise_grafica('29. Quando acontece um erro, mas ele é identificado e corrigido antes de afetar o paciente, com que frequência é notificado?')+analise_grafica('30. Quando acontece um erro, mas que não tem potencial de dano ao paciente, com que frequência é notificado?')+analise_grafica('31. Quando acontece um erro que poderia prejudicar o paciente, mas isto não ocorreu, com que frequência é notificado?')
+ggsave("Frequencia de eventos relatados.png", height=13, width=30, units="cm", dpi= 600)
+
+#Apoio de gestão hospitalar para seguraça do paciente
+analise_grafica('32. A administração do hospital cria um ambiente de trabalho que promove a segurança do paciente')+analise_grafica('39. As ações da administração do hospital mostram que a segurança do paciente é uma prioridade máxima')+analise_grafica('40. A administração do hospital parece se interessar pela segurança do paciente apenas quando acontece um evento adverso')
+ggsave("Apoio de gestão hospitalar para seguraça do paciente.png", height=11, width=30, units="cm", dpi= 600)
+
+#Trabalho em equipe entre as unidades hospitalares
+(analise_grafica('33. As unidades hospitalares não se coordenam bem entre si.')+analise_grafica('35. Existe uma boa cooperação entre as unidades hospitalares que precisam trabalhar juntas')+analise_grafica('37. Muitas vezes é desagradável trabalhar unidades com funcionários de outras unidades do hospital'))/(analise_grafica('41. As unidades do hospital trabalham bem juntas para prestar o melhor atendimento aos pacientes')+ggplot()+ggplot())
+ggsave("Trabalho em equipe entre as unidades hospitalares.png", height=22, width=30, units="cm", dpi= 600)
+
+#Trabalho em equipe no âmbito das unidades
+(analise_grafica('1. As pessoas se apoiam umas às outras nesta unidade')+analise_grafica('3. Quando há muito trabalho a ser feito e rapidamente, trabalhamos juntos em equipe para realizar a tarefa')+analise_grafica('4. Nesta unidade, as pessoas se tratam com respeito'))/(analise_grafica('11. Quando uma área nesta unidade fica muito movimentada, as demais ajudam')+ggplot()+ggplot())
+ggsave("Trabalho em equipe no âmbito das unidades.png", height=22, width=30, units="cm", dpi= 600)
+
+#Transferências internas e passagens de plantão
+(analise_grafica('34. Coisas "escapam por entre os dedos” quando os pacientes são transferidos de uma unidade para outra')+analise_grafica('36. Importantes informações sobre a assistência se perdem durante as mudanças de turno')+analise_grafica('38. Os problemas com frequência ocorrem na troca de informações entre as unidades do hospital'))/(analise_grafica('42. As mudanças de turno são problemáticas para os pacientes deste Hospital')+ggplot()+ggplot())
+ggsave("Transferências internas e passagens de plantão.png", height=22, width=30, units="cm", dpi= 600)
+
+#Aprendizado organizacional - melhoria contínua
+analise_grafica('6. Estamos ativamente buscando melhorias para a segurança do paciente')+analise_grafica('9. Erros que ocorreram levaram a mudanças positivas nesta unidade')+analise_grafica('13. Quando fazemos mudanças para melhorar a segurança do paciente, nós avaliamos sua efetividade')
+ggsave("Aprendizado organizacional - melhoria contínua.png", height=11, width=30, units="cm", dpi= 600)
+
+#Expectativas de promoção da segurança dos supervisores e gerentes
+(analise_grafica('19. Meu supervisor/gerente elogia quando vê um trabalho feito de acordo com os procedimentos estabelecidos para a segurança do paciente.')+analise_grafica('20. Meu supervisor/gerente considera seriamente as sugestões dos funcionários para melhorar a segurança do paciente')+analise_grafica('21. Sempre que a pressão aumenta, meu supervisor/gerente quer que trabalhemos mais rápido, mesmo que isto signifique tomar atalhos'))/(analise_grafica('22. Meu supervisor/gerente ignora problemas recorrentes na segurança do paciente')+ggplot()+ggplot())
+ggsave("Expectativas de promoção da segurança dos supervisores e gerentes.png", height=22, width=30, units="cm", dpi= 600)
+
+#Percepção gerais sobre segurança
+(analise_grafica('10. É apenas por acaso que erros mais sérios não acontecem por aqui')+analise_grafica('15. A segurança do paciente nunca é sacrificada em prol de se trabalhar mais')+analise_grafica('17. Temos problemas com a segurança do paciente nesta unidade'))/(analise_grafica('18. Nossos procedimentos e sistemas são bons para impedir que os erros aconteçam')+ggplot()+ggplot())
+ggsave("Percepção gerais sobre segurança.png", height=22, width=30, units="cm", dpi= 600)
+
+#Respostas não punitivas aos erros
+analise_grafica('8. Os funcionários sentem que seus erros são usados contra eles')+analise_grafica('12. Quando um evento é notificado, sentimos que o foco se concentra no indivíduo, e não no problema')+analise_grafica('16. Os funcionários se preocupam que seus erros sejam registrados em seu arquivo funcional')
+ggsave("Respostas não punitivas aos erros.png", height=11, width=30, units="cm", dpi= 600)
+
+#Staffing
+(analise_grafica('2. Temos pessoas suficientes para lidar com o volume de trabalho')+analise_grafica('5. Os funcionários desta unidade trabalham mais horas do que o recomendado no atendimento a pacientes')+analise_grafica('7. Utilizamos mais funcionários temporários do que o recomendado no atendimento a paciente'))/(analise_grafica('14. Trabalhamos “em modo de crise”, tentando fazer coisas demais, rápido demais')+ggplot()+ggplot())
+ggsave("Staffing.png", height=22, width=30, units="cm", dpi= 600)
+```
+
+```{r}
+
+```
+
+
+```{r}
+library(ggplot2)
+
+# Exemplo de DataFrame df com as colunas
+# Supondo que o DataFrame df já foi definido anteriormente
+
+# Lista das colunas adicionais
+colunas_adicionais <- c('Abertura de comunicação', 'Feedback e comunicação sobre erros', 'Frequência de eventos relatados',
+                        'Apoio de gestão hospitalar para segurança do paciente', 'Trabalho em equipe entre as unidades hospitalares',
+                        'Trabalho em equipe no âmbito das unidades', 'Transferências internas e passagens de plantão',
+                        'Aprendizado organizacional - melhoria contínua', 'Expectativas de promoção da segurança dos supervisores e gerentes',
+                        'Percepção gerais sobre segurança', 'Respostas não punitivas aos erros', 'Staffing')
+
+# Loop para criar os gráficos para as colunas adicionais
+for (coluna in colunas_adicionais) {
+  grafico <- ggplot(df, aes_string(y=coluna, x=as.factor(Regional3), fill=as.factor(Regional3))) +
+    geom_point(alpha=0.5, show.legend = FALSE, size=2.5, position=position_jitterdodge()) +
+    geom_boxplot(alpha=0.9, show.legend = FALSE) +
+    scale_y_continuous(breaks=seq(from = 1, to = 12, by = 1)) +
+    labs(y=paste(coluna, "(n)"), x="", fill="") +
+    theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic'),
+          legend.position = "bottom", axis.line = element_line(colour = "black")) +
+    theme_bw() + theme(legend.position="bottom")
+  
+  print(grafico)
+}
+
+```
+
+```{r}
+## Com gêneros com cores diferentes
+ggplot(df, aes(x = acreditacao, y = var_analisada, group = Regional3, color = Regional3)) +
+  geom_line(stat = "summary", fun.data = "mean_se", size = 0.6) +
+  geom_point(stat = "summary", fun = "mean") +
+  geom_errorbar(stat = "summary", fun.data = "mean_se", width = 0.2)
+
+
+## Com gêneros com linhas diferentes
+ggplot(df, aes(x = acreditacao, y = var_analisada, group = Regional3)) +
+  geom_line(stat = "summary", fun.data="mean_se", size = 0.6, aes(linetype = Regional3)) +
+  geom_point(stat = "summary", fun = "mean", size = 2, aes(shape = Regional3)) +
+  geom_errorbar(stat = "summary", fun.data = "mean_se", width = 0.2)
+
+
+
+# Passo 9: Análise descritiva dos dados - Pacote rstatix
+df %>%
+  group_by(Regional3, acreditacao) %>%
+  get_summary_stats(var_analisada, type = "mean_sd")
+
+```
+
+```{r}
+ggplot(df, aes(x=Ano, y=Staffing, color=acreditacao)) + geom_point() + geom_smooth(method = lm) + facet_grid(~acreditacao)
+
+ggplot(df, aes(x=as.factor(Ano), y=Staffing, fill=as.factor(acreditacao))) + geom_smooth(method = lm) + geom_boxplot() + facet_grid(~acreditacao)
+```
+```{r}
+df$acreditacao = ifelse(df$acreditacao == 1, 'Accreditation', 'No Accreditation')
+analise_grafica2 = function(coluna, titulo){
+  df_filter1 = df %>% filter(acreditacao == 'Accreditation')
+  df_filter2 = df %>% filter(acreditacao == 'No Accreditation')
+  p1 = retorne_p2(summary(lm(df_filter1[[coluna]]~Ano, data=df_filter1))$coefficients[2, "Pr(>|t|)"])
+  p2 = retorne_p2(summary(lm(df_filter2[[coluna]]~Ano, data=df_filter2))$coefficients[2, "Pr(>|t|)"])
+  subtitulo = paste0(p1, " | ", p2)
+  
+  ggplot() +
+    geom_jitter(data=df, aes(x=Ano, y=df[[coluna]], color=as.factor(Ano)), alpha=0.5, size=2.5, position=position_jitter(0.25)) + 
+    geom_boxplot(data=df, aes(x=Ano, y=df[[coluna]], color=as.factor(Ano)), alpha=0.5, fill = 'white') + 
+    geom_smooth(data=df, aes(x=Ano, y=df[[coluna]]), method = lm, color = "black") + 
+    facet_grid(acreditacao~.) + 
+    scale_x_continuous(breaks=seq(from=min(df$Ano), to=max(df$Ano), by=1)) +
+    scale_y_continuous(breaks=seq(from=as.integer(min(df[[coluna]])), 
+                                  to=as.integer(max(df[[coluna]])), 
+                                  by=as.integer((max(df[[coluna]]) - min(df[[coluna]]))/6))) +
+    theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+    theme(axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9)) +
+    theme(legend.position="none") + labs(subtitle=subtitulo, title=adicionar_quebra_de_linha(titulo), y='score(%)', x='Year')
+} 
+
+#GERAL
+(analise_grafica2('Abertura de comunicação', 'Open communication') + analise_grafica2('Feedback e comunicação sobre erros', 'Feedback and communication about errors') + analise_grafica2('Frequência de eventos relatados', 'Frequency of reported events')) /
+  (analise_grafica2('Apoio de gestão hospitalar para segurança do paciente', 'Hospital management support for patient safety') + analise_grafica2('Trabalho em equipe entre as unidades hospitalares', 'Teamwork between hospital units') + analise_grafica2('Trabalho em equipe no âmbito das unidades', 'Teamwork within units')) /
+  (analise_grafica2('Transferências internas e passagens de plantão', 'Internal transfers and shift changes') + analise_grafica2('Aprendizado organizacional - melhoria contínua', 'Organizational learning - continuous improvement') + analise_grafica2('Expectativas de promoção da segurança dos supervisores e gerentes', 'Expectations for promoting safety by supervisors and managers')) /
+  (analise_grafica2('Percepção gerais sobre segurança', 'General perceptions about safety') + analise_grafica2('Respostas não punitivas aos erros', 'Non-punitive responses to errors') + analise_grafica2('Staffing', 'Staffing'))
+ggsave("Agrupamentos2.png", height=44, width=30, units="cm", dpi=600)
+
+# Abertura de comunicação
+analise_grafica2('24. Os funcionários falam voluntariamente se vêem algo que possa afetar negativamente o atendimento aos pacientes', '24. Employees voluntarily speak up if they see something that may negatively affect patient care') + 
+analise_grafica2('26. Os funcionários sentem-se à vontade para questionar decisões ou ações dos que têm mais autoridade', '26. Staff feel free to question the decisions or actions of those with more authority') + 
+analise_grafica2('28. Os funcionários têm receio de perguntar quando algo não parece certo', '28. Staff are afraid to ask when something does not look right')
+ggsave("Abertura de comunicação2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Feedback e comunicação sobre erros
+analise_grafica2('23. Recebemos feedback das mudanças implementadas com base nos eventos notificados', '23. We are given feedback about changes put into place based on event reports') +
+analise_grafica2('25. Somos informados sobre os erros que acontecem nesta unidade', '25. We are informed about errors that happen in this unit') +
+analise_grafica2('27. Nesta unidade, discutimos maneiras de impedir que os erros tornem a acontecer', '27. In this unit, we discuss ways to prevent errors from happening again')
+ggsave("Feedback e comunicação sobre erros2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Frequência de eventos relatados
+analise_grafica2('29. Quando acontece um erro, mas ele é identificado e corrigido antes de afetar o paciente, com que frequência é notificado?', '29. When a mistake is made, but is caught and corrected before affecting the patient, how often is this reported?') +
+analise_grafica2('30. Quando acontece um erro, mas que não tem potencial de dano ao paciente, com que frequência é notificado?', '30. When a mistake is made, but has no potential to harm the patient, how often is this reported?') +
+analise_grafica2('31. Quando acontece um erro que poderia prejudicar o paciente, mas isto não ocorreu, com que frequência é notificado?', '31. When a mistake is made that could harm the patient, but does not, how often is this reported?')
+ggsave("Frequencia de eventos relatados2.png", height=13, width=30, units="cm", dpi= 600)
+
+# Apoio de gestão hospitalar para segurança do paciente
+analise_grafica2('32. A administração do hospital cria um ambiente de trabalho que promove a segurança do paciente', '32. Hospital management supports my daily efforts to keep patients safe') +
+analise_grafica2('39. As ações da administração do hospital mostram que a segurança do paciente é uma prioridade máxima', '39. Hospital management is doing a good job of keeping patient safety a top priority') +
+analise_grafica2('40. A administração do hospital parece se interessar pela segurança do paciente apenas quando acontece um evento adverso', '40. Hospital management seems interested in patient safety only after an adverse event happens')
+ggsave("Apoio de gestão hospitalar para seguraça do paciente2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Trabalho em equipe entre as unidades hospitalares
+(analise_grafica2('33. As unidades hospitalares não se coordenam bem entre si.', '33. Hospital units do not coordinate well with each other.') +
+analise_grafica2('35. Existe uma boa cooperação entre as unidades hospitalares que precisam trabalhar juntas', '35. There is good cooperation among hospital units that need to work together.') +
+analise_grafica2('37. Muitas vezes é desagradável trabalhar unidades com funcionários de outras unidades do hospital', '37. It is often unpleasant to work with staff from other hospital units.')) /
+(analise_grafica2('41. As unidades do hospital trabalham bem juntas para prestar o melhor atendimento aos pacientes', '41. Hospital units work well together to provide the best care for patients.') + ggplot() + ggplot())
+ggsave("Trabalho em equipe entre as unidades hospitalares2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Trabalho em equipe no âmbito das unidades
+(analise_grafica2('1. As pessoas se apoiam umas às outras nesta unidade', '1. People support one another in this unit.') +
+analise_grafica2('3. Quando há muito trabalho a ser feito e rapidamente, trabalhamos juntos em equipe para realizar a tarefa', '3. When a lot of work needs to be done quickly, we work together as a team to get the work done.') +
+analise_grafica2('4. Nesta unidade, as pessoas se tratam com respeito', '4. In this unit, people treat each other with respect.')) /
+(analise_grafica2('11. Quando uma área nesta unidade fica muito movimentada, as demais ajudam', '11. When one area in this unit gets busy, others help out.') + ggplot() + ggplot())
+ggsave("Trabalho em equipe no âmbito das unidades2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Transferências internas e passagens de plantão
+(analise_grafica2('34. Coisas "escapam por entre os dedos” quando os pacientes são transferidos de uma unidade para outra', '34. Things "fall through the cracks" when patients are transferred from one unit to another.') +
+analise_grafica2('36. Importantes informações sobre a assistência se perdem durante as mudanças de turno', '36. Important information about care gets lost during shift changes.') +
+analise_grafica2('38. Os problemas com frequência ocorrem na troca de informações entre as unidades do hospital', '38. Problems often occur in the exchange of information across hospital units.')) /
+  (analise_grafica2('42. As mudanças de turno são problemáticas para os pacientes deste Hospital', '42. Shift changes are problematic for patients in this Hospital.') + ggplot() + ggplot())
+ggsave("Transferências internas e passagens de plantão2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Aprendizado organizacional - melhoria contínua
+analise_grafica2('6. Estamos ativamente buscando melhorias para a segurança do paciente', '6. We are actively working to improve patient safety.') +
+analise_grafica2('9. Erros que ocorreram levaram a mudanças positivas nesta unidade', '9. Mistakes have led to positive changes in this unit.') +
+analise_grafica2('13. Quando fazemos mudanças para melhorar a segurança do paciente, nós avaliamos sua efetividade', '13. When we make changes to improve patient safety, we evaluate their effectiveness.')
+ggsave("Aprendizado organizacional - melhoria contínua2.png", height=11, width=30, units="cm", dpi= 600)
+
+#Expectativas de promoção da segurança dos supervisores e gerentes
+(analise_grafica2('19. Meu supervisor/gerente elogia quando vê um trabalho feito de acordo com os procedimentos estabelecidos para a segurança do paciente.', '19. My supervisor/manager praises when seeing a job done according to the established procedures for patient safety.') + analise_grafica2('20. Meu supervisor/gerente considera seriamente as sugestões dos funcionários para melhorar a segurança do paciente', '20. My supervisor/manager seriously considers employee suggestions to improve patient safety.') + analise_grafica2('21. Sempre que a pressão aumenta, meu supervisor/gerente quer que trabalhemos mais rápido, mesmo que isto signifique tomar atalhos', '21. Whenever pressure increases, my supervisor/manager wants us to work faster, even if it means taking shortcuts.')) /
+  (analise_grafica2('22. Meu supervisor/gerente ignora problemas recorrentes na segurança do paciente', '22. My supervisor/manager ignores recurring patient safety issues.') + ggplot() + ggplot())
+ggsave("Expectativas de promoção da segurança dos supervisores e gerentes2.png", height=22, width=30, units="cm", dpi= 600)
+
+#Percepção gerais sobre segurança
+(analise_grafica2('10. É apenas por acaso que erros mais sérios não acontecem por aqui', '10. It is just by chance that more serious errors do not happen here.') + analise_grafica2('15. A segurança do paciente nunca é sacrificada em prol de se trabalhar mais', '15. Patient safety is never sacrificed for the sake of working more.') + analise_grafica2('17. Temos problemas com a segurança do paciente nesta unidade', '17. We have problems with patient safety in this unit.')) / 
+  (analise_grafica2('18. Nossos procedimentos e sistemas são bons para impedir que os erros aconteçam', '18. Our procedures and systems are good at preventing errors from happening.') + ggplot() + ggplot())
+ggsave("Percepção gerais sobre segurança2.png", height=22, width=30, units="cm", dpi= 600)
+
+#Respostas não punitivas aos erros
+analise_grafica2('8. Os funcionários sentem que seus erros são usados contra eles', '8. Staff feel that their mistakes are held against them.') +
+analise_grafica2('12. Quando um evento é notificado, sentimos que o foco se concentra no indivíduo, e não no problema', '12. When an event is reported, it feels as if the focus is on the person, not the issue.') +
+analise_grafica2('16. Os funcionários se preocupam que seus erros sejam registrados em seu arquivo funcional', '16. Staff worry that their mistakes are kept in their personnel file.')
+ggsave("Respostas não punitivas aos erros2.png", height=11, width=30, units="cm", dpi= 600)
+
+#Staffing
+(analise_grafica2('2. Temos pessoas suficientes para lidar com o volume de trabalho', '2. We have enough staff to handle the workload.') +
+analise_grafica2('5. Os funcionários desta unidade trabalham mais horas do que o recomendado no atendimento a pacientes', '5. Staff in this unit work longer hours than is best for patient care.') +
+analise_grafica2('7. Utilizamos mais funcionários temporários do que o recomendado no atendimento a paciente', '7. We use more temporary staff than is best for patient care.')) /
+  (analise_grafica2('14. Trabalhamos “em modo de crise”, tentando fazer coisas demais, rápido demais', '14. We work in "crisis mode", trying to do too much, too quickly.') + ggplot() + ggplot())
+ggsave("Staffing2.png", height=22, width=30, units="cm", dpi= 600)
+```
+
+```{r}
+table(df$Regional3)
+analise_grafica2 = function(coluna, titulo){
+  df_filter1 = df %>% filter(Regional3 == 'SUL')
+  df_filter2 = df %>% filter(Regional3 == 'NORTE_OC')
+  p1 = retorne_p2(summary(lm(df_filter1[[coluna]]~Ano, data=df_filter1))$coefficients[2, "Pr(>|t|)"])
+  p2 = retorne_p2(summary(lm(df_filter2[[coluna]]~Ano, data=df_filter2))$coefficients[2, "Pr(>|t|)"])
+  subtitulo = paste0(p1, " | ", p2)
+  
+  ggplot() +
+    geom_jitter(data=df, aes(x=Ano, y=df[[coluna]], color=as.factor(Ano)), alpha=0.5, size=2.5, position=position_jitter(0.25)) + 
+    geom_boxplot(data=df, aes(x=Ano, y=df[[coluna]], color=as.factor(Ano)), alpha=0.5, fill = 'white') + 
+    geom_smooth(data=df, aes(x=Ano, y=df[[coluna]]), method = lm, color = "black") + 
+    facet_grid(Regional3~.) + 
+    scale_x_continuous(breaks=seq(from=min(df$Ano), to=max(df$Ano), by=1)) +
+    scale_y_continuous(breaks=seq(from=as.integer(min(df[[coluna]])), 
+                                  to=as.integer(max(df[[coluna]])), 
+                                  by=as.integer((max(df[[coluna]]) - min(df[[coluna]]))/6))) +
+    theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+    theme(axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9)) +
+    theme(legend.position="none") + labs(subtitle=subtitulo, title=adicionar_quebra_de_linha(titulo), y='score(%)', x='Year')
+} 
+
+#GERAL
+(analise_grafica2('Abertura de comunicação', 'Open communication') + analise_grafica2('Feedback e comunicação sobre erros', 'Feedback and communication about errors') + analise_grafica2('Frequência de eventos relatados', 'Frequency of reported events')) /
+  (analise_grafica2('Apoio de gestão hospitalar para segurança do paciente', 'Hospital management support for patient safety') + analise_grafica2('Trabalho em equipe entre as unidades hospitalares', 'Teamwork between hospital units') + analise_grafica2('Trabalho em equipe no âmbito das unidades', 'Teamwork within units')) /
+  (analise_grafica2('Transferências internas e passagens de plantão', 'Internal transfers and shift changes') + analise_grafica2('Aprendizado organizacional - melhoria contínua', 'Organizational learning - continuous improvement') + analise_grafica2('Expectativas de promoção da segurança dos supervisores e gerentes', 'Expectations for promoting safety by supervisors and managers')) /
+  (analise_grafica2('Percepção gerais sobre segurança', 'General perceptions about safety') + analise_grafica2('Respostas não punitivas aos erros', 'Non-punitive responses to errors') + analise_grafica2('Staffing', 'Staffing'))
+ggsave("Agrupamentos2.png", height=44, width=30, units="cm", dpi=600)
+
+# Abertura de comunicação
+analise_grafica2('24. Os funcionários falam voluntariamente se vêem algo que possa afetar negativamente o atendimento aos pacientes', '24. Employees voluntarily speak up if they see something that may negatively affect patient care') + 
+analise_grafica2('26. Os funcionários sentem-se à vontade para questionar decisões ou ações dos que têm mais autoridade', '26. Staff feel free to question the decisions or actions of those with more authority') + 
+analise_grafica2('28. Os funcionários têm receio de perguntar quando algo não parece certo', '28. Staff are afraid to ask when something does not look right')
+ggsave("Abertura de comunicação2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Feedback e comunicação sobre erros
+analise_grafica2('23. Recebemos feedback das mudanças implementadas com base nos eventos notificados', '23. We are given feedback about changes put into place based on event reports') +
+analise_grafica2('25. Somos informados sobre os erros que acontecem nesta unidade', '25. We are informed about errors that happen in this unit') +
+analise_grafica2('27. Nesta unidade, discutimos maneiras de impedir que os erros tornem a acontecer', '27. In this unit, we discuss ways to prevent errors from happening again')
+ggsave("Feedback e comunicação sobre erros2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Frequência de eventos relatados
+analise_grafica2('29. Quando acontece um erro, mas ele é identificado e corrigido antes de afetar o paciente, com que frequência é notificado?', '29. When a mistake is made, but is caught and corrected before affecting the patient, how often is this reported?') +
+analise_grafica2('30. Quando acontece um erro, mas que não tem potencial de dano ao paciente, com que frequência é notificado?', '30. When a mistake is made, but has no potential to harm the patient, how often is this reported?') +
+analise_grafica2('31. Quando acontece um erro que poderia prejudicar o paciente, mas isto não ocorreu, com que frequência é notificado?', '31. When a mistake is made that could harm the patient, but does not, how often is this reported?')
+ggsave("Frequencia de eventos relatados2.png", height=13, width=30, units="cm", dpi= 600)
+
+# Apoio de gestão hospitalar para segurança do paciente
+analise_grafica2('32. A administração do hospital cria um ambiente de trabalho que promove a segurança do paciente', '32. Hospital management supports my daily efforts to keep patients safe') +
+analise_grafica2('39. As ações da administração do hospital mostram que a segurança do paciente é uma prioridade máxima', '39. Hospital management is doing a good job of keeping patient safety a top priority') +
+analise_grafica2('40. A administração do hospital parece se interessar pela segurança do paciente apenas quando acontece um evento adverso', '40. Hospital management seems interested in patient safety only after an adverse event happens')
+ggsave("Apoio de gestão hospitalar para seguraça do paciente2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Trabalho em equipe entre as unidades hospitalares
+(analise_grafica2('33. As unidades hospitalares não se coordenam bem entre si.', '33. Hospital units do not coordinate well with each other.') +
+analise_grafica2('35. Existe uma boa cooperação entre as unidades hospitalares que precisam trabalhar juntas', '35. There is good cooperation among hospital units that need to work together.') +
+analise_grafica2('37. Muitas vezes é desagradável trabalhar unidades com funcionários de outras unidades do hospital', '37. It is often unpleasant to work with staff from other hospital units.')) /
+(analise_grafica2('41. As unidades do hospital trabalham bem juntas para prestar o melhor atendimento aos pacientes', '41. Hospital units work well together to provide the best care for patients.') + ggplot() + ggplot())
+ggsave("Trabalho em equipe entre as unidades hospitalares2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Trabalho em equipe no âmbito das unidades
+(analise_grafica2('1. As pessoas se apoiam umas às outras nesta unidade', '1. People support one another in this unit.') +
+analise_grafica2('3. Quando há muito trabalho a ser feito e rapidamente, trabalhamos juntos em equipe para realizar a tarefa', '3. When a lot of work needs to be done quickly, we work together as a team to get the work done.') +
+analise_grafica2('4. Nesta unidade, as pessoas se tratam com respeito', '4. In this unit, people treat each other with respect.')) /
+(analise_grafica2('11. Quando uma área nesta unidade fica muito movimentada, as demais ajudam', '11. When one area in this unit gets busy, others help out.') + ggplot() + ggplot())
+ggsave("Trabalho em equipe no âmbito das unidades2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Transferências internas e passagens de plantão
+(analise_grafica2('34. Coisas "escapam por entre os dedos” quando os pacientes são transferidos de uma unidade para outra', '34. Things "fall through the cracks" when patients are transferred from one unit to another.') +
+analise_grafica2('36. Importantes informações sobre a assistência se perdem durante as mudanças de turno', '36. Important information about care gets lost during shift changes.') +
+analise_grafica2('38. Os problemas com frequência ocorrem na troca de informações entre as unidades do hospital', '38. Problems often occur in the exchange of information across hospital units.')) /
+  (analise_grafica2('42. As mudanças de turno são problemáticas para os pacientes deste Hospital', '42. Shift changes are problematic for patients in this Hospital.') + ggplot() + ggplot())
+ggsave("Transferências internas e passagens de plantão2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Aprendizado organizacional - melhoria contínua
+analise_grafica2('6. Estamos ativamente buscando melhorias para a segurança do paciente', '6. We are actively working to improve patient safety.') +
+analise_grafica2('9. Erros que ocorreram levaram a mudanças positivas nesta unidade', '9. Mistakes have led to positive changes in this unit.') +
+analise_grafica2('13. Quando fazemos mudanças para melhorar a segurança do paciente, nós avaliamos sua efetividade', '13. When we make changes to improve patient safety, we evaluate their effectiveness.')
+ggsave("Aprendizado organizacional - melhoria contínua2.png", height=11, width=30, units="cm", dpi= 600)
+
+#Expectativas de promoção da segurança dos supervisores e gerentes
+(analise_grafica2('19. Meu supervisor/gerente elogia quando vê um trabalho feito de acordo com os procedimentos estabelecidos para a segurança do paciente.', '19. My supervisor/manager praises when seeing a job done according to the established procedures for patient safety.') + analise_grafica2('20. Meu supervisor/gerente considera seriamente as sugestões dos funcionários para melhorar a segurança do paciente', '20. My supervisor/manager seriously considers employee suggestions to improve patient safety.') + analise_grafica2('21. Sempre que a pressão aumenta, meu supervisor/gerente quer que trabalhemos mais rápido, mesmo que isto signifique tomar atalhos', '21. Whenever pressure increases, my supervisor/manager wants us to work faster, even if it means taking shortcuts.')) /
+  (analise_grafica2('22. Meu supervisor/gerente ignora problemas recorrentes na segurança do paciente', '22. My supervisor/manager ignores recurring patient safety issues.') + ggplot() + ggplot())
+ggsave("Expectativas de promoção da segurança dos supervisores e gerentes2.png", height=22, width=30, units="cm", dpi= 600)
+
+#Percepção gerais sobre segurança
+(analise_grafica2('10. É apenas por acaso que erros mais sérios não acontecem por aqui', '10. It is just by chance that more serious errors do not happen here.') + analise_grafica2('15. A segurança do paciente nunca é sacrificada em prol de se trabalhar mais', '15. Patient safety is never sacrificed for the sake of working more.') + analise_grafica2('17. Temos problemas com a segurança do paciente nesta unidade', '17. We have problems with patient safety in this unit.')) / 
+  (analise_grafica2('18. Nossos procedimentos e sistemas são bons para impedir que os erros aconteçam', '18. Our procedures and systems are good at preventing errors from happening.') + ggplot() + ggplot())
+ggsave("Percepção gerais sobre segurança2.png", height=22, width=30, units="cm", dpi= 600)
+
+#Respostas não punitivas aos erros
+analise_grafica2('8. Os funcionários sentem que seus erros são usados contra eles', '8. Staff feel that their mistakes are held against them.') +
+analise_grafica2('12. Quando um evento é notificado, sentimos que o foco se concentra no indivíduo, e não no problema', '12. When an event is reported, it feels as if the focus is on the person, not the issue.') +
+analise_grafica2('16. Os funcionários se preocupam que seus erros sejam registrados em seu arquivo funcional', '16. Staff worry that their mistakes are kept in their personnel file.')
+ggsave("Respostas não punitivas aos erros2.png", height=11, width=30, units="cm", dpi= 600)
+
+#Staffing
+(analise_grafica2('2. Temos pessoas suficientes para lidar com o volume de trabalho', '2. We have enough staff to handle the workload.') +
+analise_grafica2('5. Os funcionários desta unidade trabalham mais horas do que o recomendado no atendimento a pacientes', '5. Staff in this unit work longer hours than is best for patient care.') +
+analise_grafica2('7. Utilizamos mais funcionários temporários do que o recomendado no atendimento a paciente', '7. We use more temporary staff than is best for patient care.')) /
+  (analise_grafica2('14. Trabalhamos “em modo de crise”, tentando fazer coisas demais, rápido demais', '14. We work in "crisis mode", trying to do too much, too quickly.') + ggplot() + ggplot())
+ggsave("Staffing2.png", height=22, width=30, units="cm", dpi= 600)
+```
+
+```{r}
+length(lista)
+for (i in 1:length(lista)){
+  print(lista[i])
+}
+
+lista[25]
+```
+
+
+```{r}
+graffii = function(item){
+  df$var_analisada = df[[lista[item]]]
+  df_means <- df %>%
+    group_by(acreditacao, Regional3) %>%
+    summarise(mean_var = mean(var_analisada, na.rm = TRUE))
+  
+  ggplot(df, aes(x=var_analisada, fill=as.factor(Regional3))) +
+    geom_density(position='identity', alpha =0.5) + facet_grid(Regional3~acreditacao) +
+    theme(legend.position = "bottom") + labs(title=lista[item], x='Score', y='Density', fill='') +
+    geom_vline(data = df_means, aes(xintercept = mean_var), linetype="dashed", color="red", size=1)
+}
+
+for (num in 1:length(lista)){
+  print(paste0("graffii(",num,")"))
+}
+```
+
+```{r}
+graffii(1)
+graffii(2)
+graffii(3)
+graffii(4)
+graffii(5)
+graffii(6)
+graffii(7)
+graffii(8)
+graffii(9)
+graffii(10)
+graffii(11)
+graffii(12)
+graffii(13)
+graffii(14)
+graffii(15)
+graffii(16)
+graffii(17)
+graffii(18)
+graffii(19)
+graffii(20)
+graffii(21)
+graffii(22)
+graffii(23)
+graffii(24)
+graffii(25)
+graffii(26)
+graffii(27)
+graffii(28)
+graffii(29)
+graffii(30)
+graffii(31)
+graffii(32)
+graffii(33)
+graffii(34)
+graffii(35)
+graffii(36)
+graffii(37)
+graffii(38)
+graffii(39)
+graffii(40)
+graffii(41)
+graffii(42)
+graffii(43)
+```
+
+```{r}
+setwd("C:/Users/Gabriel/Documents/CULTURA DE SEGURANÇA")
+df <- read_excel("0 - Dados Limpos.xlsx")
+df
+
+df$Unidade = NULL
+df$`Qual é sua principal área ou unidade neste hospital?` = NULL
+df$...1 = NULL
+df$`SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?` = NULL
+
+for (i in names(df)){
+  if (length(levels(as.factor(df[[i]])))  <= 2){
+    print(i)
+    df[[i]] = as.factor(df[[i]])
+  }}
+df$Ano = as.factor(df$Ano)
+
+```
+
+
+```{r} 
+tabela = analise_mod(glm(df$`SEÇÃO G2: Notificou algum evento nos ultimos 12 meses`~df$Ano, family= binomial(link="logit"), data= df))
+
+
+```
+```{r}
+coluna_escolhida = 'SEÇÃO G2: Notificou algum evento nos ultimos 12 meses'
+impecilios = c(which(names(df) == coluna_escolhida))
+variaveis_analisaveis = names(df)[-impecilios]
+
+analise_univariada_completa(coluna_escolhida) %>% write_clip(dec = ",", col.names = TRUE)
+
+analise_univariada_completa_rl(coluna_escolhida) %>% write_clip(dec = ",", col.names = TRUE)
+print("terminou")
+
+anals
+```
+
+```{r}
+table_data = table(df$`SEÇÃO G2: Notificou algum evento nos ultimos 12 meses`, df$`SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?`)
+
+table_data
+
+chi2_test <- chisq.test(table_data)
+chi2_test
+
+table_data
+table_data
+chi2_test$observed
+chi2_test$expected
+chi2_test$stdres
+chi2_test$residuals
+
+```
+
+```{r}
+fd <- data.frame(Variable = character(0),"Total" = character(0),"No" = character(0),
+                 "Yes" = character(0), "Standardized Mean Difference" = character(0),
+                 IC = character(0), teste_t = character(0), MannWitney = character(0))
+
+mean(df[[coluna]][df$acreditacao == 0])
+df[[coluna]][df$acreditacao == 1]
+df$acreditacao
+for (coluna in c(lista, colunas_adicionais)){
+  if (class(df[[coluna]]) == "numeric"){
+    grupo = df[[coluna]]
+    grupo0 = df[[coluna]][df$acreditacao == 'No Accreditation']
+    grupo1 = df[[coluna]][df$acreditacao == 'Accreditation']
+    
+    ut = as.character(round(mean(grupo, na.rm=T), 2))
+    u0 = as.character(round(mean(grupo0, na.rm=T), 2))
+    u1 = as.character(round(mean(grupo1, na.rm=T), 2))
+    
+    sdt = as.character(round(sd(grupo, na.rm=T), 2))
+    sd0 = as.character(round(sd(grupo0, na.rm=T), 2))
+    sd1 = as.character(round(sd(grupo1, na.rm=T), 2))
+    
+    u_sdt = paste0(ut," ± ",sd0)
+    u_sd0 = paste0(u0," ± ",sd0)
+    u_sd1 = paste0(u1," ± ",sd1)
+    
+    d_cohen <- cohen.d(grupo1, grupo0)
+    estimador = as.character(round(d_cohen$estimate[1], 2))
+    
+    IC_0 = as.character(round(d_cohen$conf.int[1], 2))
+    if (IC_0 < 0){IC_0 = paste0("(",IC_0,")")}
+    IC_1 = as.character(round(d_cohen$conf.int[2], 2))
+    if (IC_1 < 0){IC_1 = paste0("(",IC_1,")")}
+    IC = paste0(IC_0,"-",IC_1)
+    
+    teste_t = retorne_p(t.test(df[[coluna]]~df$acreditacao, data=df)$p.value)
+    man = retorne_p(wilcox.test(df[[coluna]]~df$acreditacao, data=df)$p.value)
+    
+    fd[nrow(fd)+1,] = c(coluna,u_sdt,u_sd0,u_sd1,estimador,IC,teste_t,man) 
+  }
+}
+capture(fd)
+
+coluna
+
+numero = 3
+lista[[numero]]
+aggregate(df[[lista[numero]]]~df$acreditacao, df, mean)
+
+```
+```{r}
+grafi = df %>% group_by(Ano, acreditacao) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 2)) %>% ungroup()
+
+capture(grafi)
+
+ggplot(grafi, aes(x=Ano, y=n, fill=acreditacao)) + geom_col()
+
+ggplot(grafi, aes(as.factor(Ano), n, label=n, fill=as.factor(acreditacao))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(~acreditacao) +
+  geom_text(aes(y=n, label = n, vjust=-0.1)) + 
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic'))
+```
+
+```{r}
+install.packages("translateR")
+library(translateR)
+
+# Defina sua chave da API
+google_key <- "YOUR_GOOGLE_CLOUD_API_KEY"
+
+# Traduzindo um texto do inglês para o português
+result <- translate_text("Hello, world!", source = "en", target = "pt", 
+                         google_translate_key = google_key)
+
+print(result$translatedText)
+
+```
+```{r}
+install.packages("googleLanguageR")
+library(googleLanguageR)
+
+# Defina sua chave da API
+Sys.setenv(GOOGLE_APPLICATION_CREDENTIALS = "path_to_your_google_credentials.json")
+
+# Traduzindo um texto do inglês para o português
+result <- gl_translate(text = "Hello, world!", source = "en", target = "pt")
+print(result$translatedText)
+
+result <- gl_translate("Hello, world!", source = "en", target = "pt")
+print(result$translatedText)
+
+
+```
+

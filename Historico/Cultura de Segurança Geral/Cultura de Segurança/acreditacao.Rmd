@@ -1,0 +1,1328 @@
+```{r}
+# Linear Mixed Model
+library(lme4)
+library(lmerTest)
+
+#setwd("C:/Users/Gabriel/Onedrive/Documentos/CULTURA DE SEGURANÇA")
+df <- read_excel("4 - Dados_Score_Ano_vs_Acreditacao_vs_Unidade.xlsx")
+df_backup = df
+
+df$acreditacao = ifelse(df$acreditacao == 1, 'AH', 'NAH')
+df$acreditacao = as.factor(df$acreditacao)
+levels(df$acreditacao)
+```
+```{r}
+table(df$Regional, df$acreditacao)
+conti(df, "acreditacao","Regional")
+```
+```{r LISTA DAS COLUNAS}
+lista = c('1. As pessoas se apoiam umas às outras nesta unidade',
+       '2. Temos pessoas suficientes para lidar com o volume de trabalho',
+       '3. Quando há muito trabalho a ser feito e rapidamente, trabalhamos juntos em equipe para realizar a tarefa',
+       '4. Nesta unidade, as pessoas se tratam com respeito',
+       '5. Os funcionários desta unidade trabalham mais horas do que o recomendado no atendimento a pacientes',
+       '6. Estamos ativamente buscando melhorias para a segurança do paciente',
+       '7. Utilizamos mais funcionários temporários do que o recomendado no atendimento a paciente',
+       '8. Os funcionários sentem que seus erros são usados contra eles',
+       '9. Erros que ocorreram levaram a mudanças positivas nesta unidade',
+       '10. É apenas por acaso que erros mais sérios não acontecem por aqui',
+       '11. Quando uma área nesta unidade fica muito movimentada, as demais ajudam',
+       '12. Quando um evento é notificado, sentimos que o foco se concentra no indivíduo, e não no problema',
+       '13. Quando fazemos mudanças para melhorar a segurança do paciente, nós avaliamos sua efetividade',
+       '14. Trabalhamos “em modo de crise”, tentando fazer coisas demais, rápido demais',
+       '15. A segurança do paciente nunca é sacrificada em prol de se trabalhar mais',
+       '16. Os funcionários se preocupam que seus erros sejam registrados em seu arquivo funcional',
+       '17. Temos problemas com a segurança do paciente nesta unidade',
+       '18. Nossos procedimentos e sistemas são bons para impedir que os erros aconteçam',
+       '19. Meu supervisor/gerente elogia quando vê um trabalho feito de acordo com os procedimentos estabelecidos para a segurança do paciente.',
+       '20. Meu supervisor/gerente considera seriamente as sugestões dos funcionários para melhorar a segurança do paciente',
+       '21. Sempre que a pressão aumenta, meu supervisor/gerente quer que trabalhemos mais rápido, mesmo que isto signifique tomar atalhos',
+       '22. Meu supervisor/gerente ignora problemas recorrentes na segurança do paciente',
+       '23. Recebemos feedback das mudanças implementadas com base nos eventos notificados',
+       '24. Os funcionários falam voluntariamente se vêem algo que possa afetar negativamente o atendimento aos pacientes',
+       '25. Somos informados sobre os erros que acontecem nesta unidade',
+       '26. Os funcionários sentem-se à vontade para questionar decisões ou ações dos que têm mais autoridade',
+       '27. Nesta unidade, discutimos maneiras de impedir que os erros tornem a acontecer',
+       '28. Os funcionários têm receio de perguntar quando algo não parece certo',
+       '29. Quando acontece um erro, mas ele é identificado e corrigido antes de afetar o paciente, com que frequência é notificado?',
+       '30. Quando acontece um erro, mas que não tem potencial de dano ao paciente, com que frequência é notificado?',
+       '31. Quando acontece um erro que poderia prejudicar o paciente, mas isto não ocorreu, com que frequência é notificado?',
+       #'Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar.',
+       '32. A administração do hospital cria um ambiente de trabalho que promove a segurança do paciente',
+       '33. As unidades hospitalares não se coordenam bem entre si.',
+       '34. Coisas "escapam por entre os dedos” quando os pacientes são transferidos de uma unidade para outra',
+       '35. Existe uma boa cooperação entre as unidades hospitalares que precisam trabalhar juntas',
+       '36. Importantes informações sobre a assistência se perdem durante as mudanças de turno',
+       '37. Muitas vezes é desagradável trabalhar unidades com funcionários de outras unidades do hospital',
+       '38. Os problemas com frequência ocorrem na troca de informações entre as unidades do hospital',
+       '39. As ações da administração do hospital mostram que a segurança do paciente é uma prioridade máxima',
+       '40. A administração do hospital parece se interessar pela segurança do paciente apenas quando acontece um evento adverso',
+       '41. As unidades do hospital trabalham bem juntas para prestar o melhor atendimento aos pacientes',
+       '42. As mudanças de turno são problemáticas para os pacientes deste Hospital')
+
+colunas_adicionais <- c('Abertura de comunicação', 'Feedback e comunicação sobre erros', 'Frequência de eventos relatados',
+                        'Apoio de gestão hospitalar para segurança do paciente', 'Trabalho em equipe entre as unidades hospitalares',
+                        'Trabalho em equipe no âmbito das unidades', 'Transferências internas e passagens de plantão',
+                        'Aprendizado organizacional - melhoria contínua', 'Expectativas de promoção da segurança dos supervisores e gerentes',
+                        'Percepção gerais sobre segurança', 'Respostas não punitivas aos erros', 'Staffing')
+
+lista = c(lista, colunas_adicionais)
+
+colunas_adicionais = c('SEÇÃO G2: Notificou algum evento nos ultimos 12 meses',
+                    'SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?_0. Nenhuma notificações de eventos',
+                    'SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?_1. 1 a 2 notificações de eventos',
+                    'SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?_2. 3 a 5 notificações de eventos',
+                    'SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?_3. 6 a 10 notificações de eventos',
+                    'SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?_4. 11 a 20 notificações de eventos',
+                    'SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?_5. 21 notificações de eventos ou mais',
+                    'SEÇÃO H: 3.2 Trabalha mais que 40horas semanais',
+                    'SEÇÃO H: 3.2 Trabalha mais que 60horas semanais',
+                    'SEÇÃO H: 3.2 Trabalha mais que 80horas semanais',
+                    'Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar._Excelente',
+                    'Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar._Muito boa',
+                    'Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar._Muito ruim',
+                    'Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar._Ruim',
+                    'Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar._Satisfatória',
+                    'Nota Geral == Satisfatoria ?', 'Nota Geral == Boa ?',
+                    'SEÇÃO H: 1.2 trabalha a mais de 1 ano no hospital?',
+                    'SEÇÃO H: 1.3 trabalha a mais de 5 anos no hospital?',
+                    'SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?_0. Menos de 1 ano',
+                    'SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?_1. 1 a 5 anos',
+                    'SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?_2. 6 a 10 anos',
+                    'SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?_3. 11 a 15 anos',
+                    'SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?_4. 16 a 20 anos',
+                    'SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?_5. 21 anos ou mais',
+                    '6. Há quanto tempo você trabalha em sua profissão ou especialização atual?_0. Menos de 1 ano',
+                    '6. Há quanto tempo você trabalha em sua profissão ou especialização atual?_1. 1 a 5 anos',
+                    '6. Há quanto tempo você trabalha em sua profissão ou especialização atual?_2. 6 a 10 anos',
+                    '6. Há quanto tempo você trabalha em sua profissão ou especialização atual?_3. 11 a 15 anos',
+                    '6. Há quanto tempo você trabalha em sua profissão ou especialização atual?_4. 16 a 20 anos',
+                    '6. Há quanto tempo você trabalha em sua profissão ou especialização atual?_5. 21 anos ou mais')
+lista = c(lista, colunas_adicionais)
+```
+
+####################################################################################################
+
+```{r teste}
+coluna = "Abertura de comunicação"
+grupo = df[[coluna]]
+grupo0 = df[[coluna]][df$acreditacao == 'NAH']
+grupo1 = df[[coluna]][df$acreditacao == 'AH']
+
+#Teste de Hipotese - Teste Mann Whitney
+teste_man = wilcox.test(grupo1,grupo0,conf.int = TRUE)
+man = retorne_p(teste_man$p.value)
+man
+```
+
+```{r FUNÇÃO GRAFICOS BOXPLOT + VIOLINO + JITTER POINTS}
+ df$acreditacao <- factor(df$acreditacao, levels = c('NAH', 'AH'))
+
+table(df$acreditacao)
+
+analise_grafica = function(coluna, titulo){
+  grupo = df[[coluna]]
+  grupo0 = df[[coluna]][df$acreditacao == 'NAH']
+  grupo1 = df[[coluna]][df$acreditacao == 'AH']
+  
+  #Teste de Hipotese - Teste Mann Whitney
+  teste_man = wilcox.test(grupo1,grupo0,conf.int = TRUE)
+  man = retorne_p_ajust(retorne_p(teste_man$p.value))
+  
+  #Estimador Hodges Lehmann
+  estimador = as.character(rround(teste_man$estimate,2))
+  IC_00 = as.character(rround(teste_man$conf.int[1],2))
+  IC_01 = as.character(rround(teste_man$conf.int[2],2))
+  hodges_lehmann = paste0(estimador,' [',IC_00,' to ',IC_01,']')
+  
+  texto_dentro_do_grafico = paste0(man)
+  eixo_x = paste0("Median of Differences = ", hodges_lehmann)
+  
+  ggplot() + 
+    geom_jitter(data=df, aes(x=as.factor(acreditacao), y=df[[coluna]], fill=as.factor(acreditacao)), 
+                alpha=0.5, size=2.5, position=position_jitter(0.25), show.legend = F) + 
+    geom_violin(data=df, aes(x=as.factor(acreditacao), y=df[[coluna]], fill=as.factor(acreditacao)), 
+                show.legend = F, alpha=0.2) + 
+    geom_boxplot(data=df, aes(x=as.factor(acreditacao), y=df[[coluna]], fill=as.factor(acreditacao)), 
+                 alpha=0.90, show.legend = F, width = 0.5, fill = 'white') + 
+    annotate("text", x = 1.5, y = max(df[[coluna]],na.rm = T), 
+             label = texto_dentro_do_grafico, vjust = 0.7, size = 4, color = "black") +
+    labs(y='Score (%)', title=adicionar_quebra_de_linha(titulo, 38), x=eixo_x) + 
+    theme(axis.title=element_text(size=9), 
+          legend.position = "bottom", axis.line = element_line(colour = "black")) +
+    theme_bw() + 
+    scale_y_continuous(breaks=seq(from = 0, 
+                                  to = max(df[[coluna]],na.rm = T), 
+                                  by = as.integer((max(df[[coluna]],na.rm = T) - min(df[[coluna]],na.rm = T))/10)),
+                       limits = c(min(df[[coluna]],na.rm = T), max(df[[coluna]],na.rm = T))) +
+    theme(axis.title.x = element_text(size = 11),
+          axis.title.y = element_text(size = 11))
+}
+
+analise_grafica('Abertura de comunicação', 'Open communication')
+
+#    theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic'), 
+#          legend.position = "bottom", axis.line = element_line(colour = "black")) +
+#    geom_errorbar(data=df, aes(x=as.factor(acreditacao), y=df[[coluna]], fill=as.factor(acreditacao)), 
+#                  stat = "summary", fun.data = "mean_se", width= 0.14, color="pink") +
+#    geom_point(data=df, aes(x=as.factor(acreditacao), y=df[[coluna]], fill=as.factor(acreditacao)), 
+#               stat = "summary", fun = "mean", show.legend = F, color="red", size=2) + 
+
+```
+
+```{r CRIANDO GRAFICOS ACIMA}
+##############################################################################################
+#GERAL
+(analise_grafica('Abertura de comunicação', 'Open communication') + analise_grafica('Feedback e comunicação sobre erros', 'Feedback and communication about errors') + analise_grafica('Frequência de eventos relatados', 'Frequency of reported events')) /
+  (analise_grafica('Apoio de gestão hospitalar para segurança do paciente', 'Hospital management support for patient safety') + analise_grafica('Trabalho em equipe entre as unidades hospitalares', 'Teamwork between hospital units') + analise_grafica('Trabalho em equipe no âmbito das unidades', 'Teamwork within units')) /
+  (analise_grafica('Transferências internas e passagens de plantão', 'Internal transfers and shift changes') + analise_grafica('Aprendizado organizacional - melhoria contínua', 'Organizational learning - continuous improvement') + analise_grafica('Expectativas de promoção da segurança dos supervisores e gerentes', 'Expectations for promoting safety by supervisors and managers')) /
+  (analise_grafica('Percepção gerais sobre segurança', 'General perceptions about safety') + analise_grafica('Respostas não punitivas aos erros', 'Non-punitive responses to errors') + analise_grafica('Staffing', 'Staffing'))
+ggsave("Agrupamentos2.png", height=44, width=30, units="cm", dpi=600)
+
+# Abertura de comunicação
+analise_grafica('24. Os funcionários falam voluntariamente se vêem algo que possa afetar negativamente o atendimento aos pacientes', '24. Employees voluntarily speak up if they see something that may negatively affect patient care') + 
+analise_grafica('26. Os funcionários sentem-se à vontade para questionar decisões ou ações dos que têm mais autoridade', '26. Staff feel free to question the decisions or actions of those with more authority') + 
+analise_grafica('28. Os funcionários têm receio de perguntar quando algo não parece certo', '28. Staff are afraid to ask when something does not look right')
+ggsave("Abertura de comunicação2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Feedback e comunicação sobre erros
+analise_grafica('23. Recebemos feedback das mudanças implementadas com base nos eventos notificados', '23. We are given feedback about changes put into place based on event reports') +
+analise_grafica('25. Somos informados sobre os erros que acontecem nesta unidade', '25. We are informed about errors that happen in this unit') +
+analise_grafica('27. Nesta unidade, discutimos maneiras de impedir que os erros tornem a acontecer', '27. In this unit, we discuss ways to prevent errors from happening again')
+ggsave("Feedback e comunicação sobre erros2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Frequência de eventos relatados
+analise_grafica('29. Quando acontece um erro, mas ele é identificado e corrigido antes de afetar o paciente, com que frequência é notificado?', '29. When a mistake is made, but is caught and corrected before affecting the patient, how often is this reported?') +
+analise_grafica('30. Quando acontece um erro, mas que não tem potencial de dano ao paciente, com que frequência é notificado?', '30. When a mistake is made, but has no potential to harm the patient, how often is this reported?') +
+analise_grafica('31. Quando acontece um erro que poderia prejudicar o paciente, mas isto não ocorreu, com que frequência é notificado?', '31. When a mistake is made that could harm the patient, but does not, how often is this reported?')
+ggsave("Frequencia de eventos relatados2.png", height=13, width=30, units="cm", dpi= 600)
+
+# Apoio de gestão hospitalar para segurança do paciente
+analise_grafica('32. A administração do hospital cria um ambiente de trabalho que promove a segurança do paciente', '32. Hospital management supports my daily efforts to keep patients safe') +
+analise_grafica('39. As ações da administração do hospital mostram que a segurança do paciente é uma prioridade máxima', '39. Hospital management is doing a good job of keeping patient safety a top priority') +
+analise_grafica('40. A administração do hospital parece se interessar pela segurança do paciente apenas quando acontece um evento adverso', '40. Hospital management seems interested in patient safety only after an adverse event happens')
+ggsave("Apoio de gestão hospitalar para seguraça do paciente2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Trabalho em equipe entre as unidades hospitalares
+(analise_grafica('33. As unidades hospitalares não se coordenam bem entre si.', '33. Hospital units do not coordinate well with each other.') +
+analise_grafica('35. Existe uma boa cooperação entre as unidades hospitalares que precisam trabalhar juntas', '35. There is good cooperation among hospital units that need to work together.') +
+analise_grafica('37. Muitas vezes é desagradável trabalhar unidades com funcionários de outras unidades do hospital', '37. It is often unpleasant to work with staff from other hospital units.')) /
+(analise_grafica('41. As unidades do hospital trabalham bem juntas para prestar o melhor atendimento aos pacientes', '41. Hospital units work well together to provide the best care for patients.') + ggplot() + ggplot())
+ggsave("Trabalho em equipe entre as unidades hospitalares2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Trabalho em equipe no âmbito das unidades
+(analise_grafica('1. As pessoas se apoiam umas às outras nesta unidade', '1. People support one another in this unit.') +
+analise_grafica('3. Quando há muito trabalho a ser feito e rapidamente, trabalhamos juntos em equipe para realizar a tarefa', '3. When a lot of work needs to be done quickly, we work together as a team to get the work done.') +
+analise_grafica('4. Nesta unidade, as pessoas se tratam com respeito', '4. In this unit, people treat each other with respect.')) /
+(analise_grafica('11. Quando uma área nesta unidade fica muito movimentada, as demais ajudam', '11. When one area in this unit gets busy, others help out.') + ggplot() + ggplot())
+ggsave("Trabalho em equipe no âmbito das unidades2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Transferências internas e passagens de plantão
+(analise_grafica('34. Coisas "escapam por entre os dedos” quando os pacientes são transferidos de uma unidade para outra', '34. Things "fall through the cracks" when patients are transferred from one unit to another.') +
+analise_grafica('36. Importantes informações sobre a assistência se perdem durante as mudanças de turno', '36. Important information about care gets lost during shift changes.') +
+analise_grafica('38. Os problemas com frequência ocorrem na troca de informações entre as unidades do hospital', '38. Problems often occur in the exchange of information across hospital units.')) /
+  (analise_grafica('42. As mudanças de turno são problemáticas para os pacientes deste Hospital', '42. Shift changes are problematic for patients in this Hospital.') + ggplot() + ggplot())
+ggsave("Transferências internas e passagens de plantão2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Aprendizado organizacional - melhoria contínua
+analise_grafica('6. Estamos ativamente buscando melhorias para a segurança do paciente', '6. We are actively working to improve patient safety.') +
+analise_grafica('9. Erros que ocorreram levaram a mudanças positivas nesta unidade', '9. Mistakes have led to positive changes in this unit.') +
+analise_grafica('13. Quando fazemos mudanças para melhorar a segurança do paciente, nós avaliamos sua efetividade', '13. When we make changes to improve patient safety, we evaluate their effectiveness.')
+ggsave("Aprendizado organizacional - melhoria contínua2.png", height=11, width=30, units="cm", dpi= 600)
+
+#Expectativas de promoção da segurança dos supervisores e gerentes
+(analise_grafica('19. Meu supervisor/gerente elogia quando vê um trabalho feito de acordo com os procedimentos estabelecidos para a segurança do paciente.', '19. My supervisor/manager praises when seeing a job done according to the established procedures for patient safety.') + analise_grafica('20. Meu supervisor/gerente considera seriamente as sugestões dos funcionários para melhorar a segurança do paciente', '20. My supervisor/manager seriously considers employee suggestions to improve patient safety.') + analise_grafica('21. Sempre que a pressão aumenta, meu supervisor/gerente quer que trabalhemos mais rápido, mesmo que isto signifique tomar atalhos', '21. Whenever pressure increases, my supervisor/manager wants us to work faster, even if it means taking shortcuts.')) /
+  (analise_grafica('22. Meu supervisor/gerente ignora problemas recorrentes na segurança do paciente', '22. My supervisor/manager ignores recurring patient safety issues.') + ggplot() + ggplot())
+ggsave("Expectativas de promoção da segurança dos supervisores e gerentes2.png", height=22, width=30, units="cm", dpi= 600)
+
+#Percepção gerais sobre segurança
+(analise_grafica('10. É apenas por acaso que erros mais sérios não acontecem por aqui', '10. It is just by chance that more serious errors do not happen here.') + analise_grafica('15. A segurança do paciente nunca é sacrificada em prol de se trabalhar mais', '15. Patient safety is never sacrificed for the sake of working more.') + analise_grafica('17. Temos problemas com a segurança do paciente nesta unidade', '17. We have problems with patient safety in this unit.')) / 
+  (analise_grafica('18. Nossos procedimentos e sistemas são bons para impedir que os erros aconteçam', '18. Our procedures and systems are good at preventing errors from happening.') + ggplot() + ggplot())
+ggsave("Percepção gerais sobre segurança2.png", height=22, width=30, units="cm", dpi= 600)
+
+#Respostas não punitivas aos erros
+analise_grafica('8. Os funcionários sentem que seus erros são usados contra eles', '8. Staff feel that their mistakes are held against them.') +
+analise_grafica('12. Quando um evento é notificado, sentimos que o foco se concentra no indivíduo, e não no problema', '12. When an event is reported, it feels as if the focus is on the person, not the issue.') +
+analise_grafica('16. Os funcionários se preocupam que seus erros sejam registrados em seu arquivo funcional', '16. Staff worry that their mistakes are kept in their personnel file.')
+ggsave("Respostas não punitivas aos erros2.png", height=11, width=30, units="cm", dpi= 600)
+
+#Staffing
+(analise_grafica('2. Temos pessoas suficientes para lidar com o volume de trabalho', '2. We have enough staff to handle the workload.') +
+analise_grafica('5. Os funcionários desta unidade trabalham mais horas do que o recomendado no atendimento a pacientes', '5. Staff in this unit work longer hours than is best for patient care.') +
+analise_grafica('7. Utilizamos mais funcionários temporários do que o recomendado no atendimento a paciente', '7. We use more temporary staff than is best for patient care.')) /
+  (analise_grafica('14. Trabalhamos “em modo de crise”, tentando fazer coisas demais, rápido demais', '14. We work in "crisis mode", trying to do too much, too quickly.') + ggplot() + ggplot())
+ggsave("Staffing2.png", height=22, width=30, units="cm", dpi= 600)
+```
+
+```{r TESTE: GRAFICO DE ERRO}
+analise_grafica = function(coluna){
+  grupo = df[[coluna]]
+  grupo0 = df[[coluna]][df$acreditacao == 'NAH']
+  grupo1 = df[[coluna]][df$acreditacao == 'AH']
+  
+  #
+  media0 = mean(grupo0, na.rm=T)
+  sd0 = sd(grupo0, na.rm=T)
+  #print(media0)
+  media1 = mean(grupo1, na.rm=T)
+  sd1 = sd(grupo1, na.rm=T)
+  #print(media1)
+  
+  #Teste de Hipotese - Teste Mann Whitney
+  teste_man = t.test(grupo1,grupo0)
+  man = retorne_p(teste_man$p.value)
+  
+  #Tamanho do efeito (parametrico)
+  d_cohen <- cohen.d(grupo1,grupo0)
+  estimador = as.character(rround(d_cohen$estimate[1],2))
+  IC_0 = as.character(rround(d_cohen$conf.int[1],2))
+  IC_1 = as.character(rround(d_cohen$conf.int[2],2))
+  d_cohen = paste0(estimador," (",IC_0," to ",IC_1,")")
+  
+  eixo_x = paste0("Mean Difference = ", d_cohen)#, '\nr = ', r)
+  texto_dentro_do_grafico = man
+  titulo = paste0(coluna)
+  
+  if (media0 > media1){
+    maior_valor = media0 + sd0
+    menor_valor = media1 - sd1
+  }else{
+    maior_valor = media1 + sd1
+    menor_valor = media0 - sd0
+  }
+  #print(media0)
+  #print(media1)
+  #print(maior_valor)
+  #print(menor_valor)
+  
+  ggplot() + 
+    geom_errorbar(data=df, aes(x=as.factor(acreditacao), y=df[[coluna]], fill=as.factor(acreditacao)), 
+                  stat = "summary", fun.data = "mean_se", width= 0.14, color="black") +
+    geom_point(data=df, aes(x=as.factor(acreditacao), y=df[[coluna]], fill=as.factor(acreditacao)), 
+               stat = "summary", fun = "mean", show.legend = F, color="red", size=2) + 
+    annotate("text", x = 1.5, y = maior_valor, label = texto_dentro_do_grafico, vjust = 0.7, size = 4, color = "black") +
+    labs(y='Score', title=adicionar_quebra_de_linha(titulo), x=eixo_x) + 
+    theme(axis.title=element_text(size=9), 
+          legend.position = "bottom", axis.line = element_line(colour = "black")) +
+    theme_bw() + 
+    #scale_y_continuous(breaks=seq(from = menor_valor, 
+                         #         to = maior_valor,
+                        #          by = round((maior_valor - menor_valor)/10, 4)),
+                       #limits = c(menor_valor, maior_valor)) +
+    theme(axis.title.x = element_text(size = 11),
+          axis.title.y = element_text(size = 11))
+}
+
+##############################################################################################
+
+analise_grafica('Staffing')
+analise_grafica('Abertura de comunicação')
+```
+
+```{r teste}
+retorne_p_ajust(retorne_p(summary(lmer(df_filter[["Staffing"]] ~ Ano + (1 | Unidade), data = df_filter2))$coefficients[2, "Pr(>|t|)"]))
+
+
+summary(lmer(df_filter2[["Staffing"]] ~ Ano + (1 | Unidade), data = df_filter2))
+
+
+
+
+```
+
+```{r ANALISE DE TENDENCIA: FUNÇÃO GRAFICOS LINHA + JITTER + BOXPLOT}
+df$acreditacao <- factor(df$acreditacao, levels = c('AH','NAH'))
+
+analise_grafica2 = function(coluna, titulo){
+  df_filter1 = df %>% filter(acreditacao == 'AH')
+  df_filter2 = df %>% filter(acreditacao == 'NAH')
+  #p1 = retorne_p_ajust(retorne_p(summary(lm(df_filter1[[coluna]]~Ano, data=df_filter1))$coefficients[2, "Pr(>|t|)"]))
+  p1 = retorne_p_ajust(retorne_p(summary(lmer(df_filter1[[coluna]] ~ Ano + (1 | Unidade), data = df_filter1))$coefficients[2, "Pr(>|t|)"]))
+  p1 = paste0('AH (', p1, ')')
+  
+  
+  #p2 = retorne_p_ajust(retorne_p(summary(lm(df_filter2[[coluna]]~Ano, data=df_filter2))$coefficients[2, "Pr(>|t|)"]))
+  p2 = retorne_p_ajust(retorne_p(summary(lmer(df_filter2[[coluna]] ~ Ano + (1 | Unidade), data = df_filter2))$coefficients[2, "Pr(>|t|)"]))
+  p2 = paste0('NAH (', p2, ')')
+  subtitulo = paste0(p1, ";  ", p2)
+  
+  ggplot() +
+    geom_jitter(data=df, aes(x=Ano, y=df[[coluna]], color=as.factor(Ano)), 
+                alpha=0.5, size=2.5, position=position_jitter(0.25)) + 
+    geom_boxplot(data=df, aes(x=Ano, y=df[[coluna]], color=as.factor(Ano)), 
+                 alpha=0.5, fill = 'white') + 
+    geom_smooth(data=df, aes(x=Ano, y=df[[coluna]]), method = lm, color = "black") + 
+    facet_grid(acreditacao~.) + 
+    scale_x_continuous(breaks=seq(from=min(df$Ano), to=max(df$Ano), by=1)) +
+    scale_y_continuous(breaks=seq(from=as.integer(min(df[[coluna]])), 
+                                  to=as.integer(max(df[[coluna]])), 
+                                  by=as.integer((max(df[[coluna]]) - min(df[[coluna]]))/6))) +
+    theme(axis.title=element_text(size=9), 
+          legend.position = "none", axis.line = element_line(colour = "black")) +
+    theme_bw() + theme(legend.position="none") + 
+    labs(subtitle=subtitulo, title=adicionar_quebra_de_linha(titulo, 38), y='Score (%)', x='Year')
+} 
+
+analise_grafica2('Abertura de comunicação', 'Open communication')
+
+analise_grafica2('Nota Geral == Boa ?', '')
+ggsave("Proporção_notas.png", height=16, width=18, units="cm", dpi= 600)
+
+```
+
+```{r CRIANDO GRAFICOS ACIMA}
+#GERAL
+(analise_grafica2('Abertura de comunicação', 'Open communication') + analise_grafica2('Feedback e comunicação sobre erros', 'Feedback and communication about errors') + analise_grafica2('Frequência de eventos relatados', 'Frequency of reported events')) /
+  (analise_grafica2('Apoio de gestão hospitalar para segurança do paciente', 'Hospital management support for patient safety') + analise_grafica2('Trabalho em equipe entre as unidades hospitalares', 'Teamwork between hospital units') + analise_grafica2('Trabalho em equipe no âmbito das unidades', 'Teamwork within units')) /
+  (analise_grafica2('Transferências internas e passagens de plantão', 'Internal transfers and shift changes') + analise_grafica2('Aprendizado organizacional - melhoria contínua', 'Organizational learning - continuous improvement') + analise_grafica2('Expectativas de promoção da segurança dos supervisores e gerentes', 'Expectations for promoting safety by supervisors and managers')) /
+  (analise_grafica2('Percepção gerais sobre segurança', 'General perceptions about safety') + analise_grafica2('Respostas não punitivas aos erros', 'Non-punitive responses to errors') + analise_grafica2('Staffing', 'Staffing'))
+ggsave("Agrupamentos2.png", height=44, width=30, units="cm", dpi=600)
+
+# Abertura de comunicação
+analise_grafica2('24. Os funcionários falam voluntariamente se vêem algo que possa afetar negativamente o atendimento aos pacientes', '24. Employees voluntarily speak up if they see something that may negatively affect patient care') + 
+analise_grafica2('26. Os funcionários sentem-se à vontade para questionar decisões ou ações dos que têm mais autoridade', '26. Staff feel free to question the decisions or actions of those with more authority') + 
+analise_grafica2('28. Os funcionários têm receio de perguntar quando algo não parece certo', '28. Staff are afraid to ask when something does not look right')
+ggsave("Abertura de comunicação2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Feedback e comunicação sobre erros
+analise_grafica2('23. Recebemos feedback das mudanças implementadas com base nos eventos notificados', '23. We are given feedback about changes put into place based on event reports') +
+analise_grafica2('25. Somos informados sobre os erros que acontecem nesta unidade', '25. We are informed about errors that happen in this unit') +
+analise_grafica2('27. Nesta unidade, discutimos maneiras de impedir que os erros tornem a acontecer', '27. In this unit, we discuss ways to prevent errors from happening again')
+ggsave("Feedback e comunicação sobre erros2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Frequência de eventos relatados
+analise_grafica2('29. Quando acontece um erro, mas ele é identificado e corrigido antes de afetar o paciente, com que frequência é notificado?', '29. When a mistake is made, but is caught and corrected before affecting the patient, how often is this reported?') +
+analise_grafica2('30. Quando acontece um erro, mas que não tem potencial de dano ao paciente, com que frequência é notificado?', '30. When a mistake is made, but has no potential to harm the patient, how often is this reported?') +
+analise_grafica2('31. Quando acontece um erro que poderia prejudicar o paciente, mas isto não ocorreu, com que frequência é notificado?', '31. When a mistake is made that could harm the patient, but does not, how often is this reported?')
+ggsave("Frequencia de eventos relatados2.png", height=13, width=30, units="cm", dpi= 600)
+
+# Apoio de gestão hospitalar para segurança do paciente
+analise_grafica2('32. A administração do hospital cria um ambiente de trabalho que promove a segurança do paciente', '32. Hospital management supports my daily efforts to keep patients safe') +
+analise_grafica2('39. As ações da administração do hospital mostram que a segurança do paciente é uma prioridade máxima', '39. Hospital management is doing a good job of keeping patient safety a top priority') +
+analise_grafica2('40. A administração do hospital parece se interessar pela segurança do paciente apenas quando acontece um evento adverso', '40. Hospital management seems interested in patient safety only after an adverse event happens')
+ggsave("Apoio de gestão hospitalar para seguraça do paciente2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Trabalho em equipe entre as unidades hospitalares
+(analise_grafica2('33. As unidades hospitalares não se coordenam bem entre si.', '33. Hospital units do not coordinate well with each other.') +
+analise_grafica2('35. Existe uma boa cooperação entre as unidades hospitalares que precisam trabalhar juntas', '35. There is good cooperation among hospital units that need to work together.') +
+analise_grafica2('37. Muitas vezes é desagradável trabalhar unidades com funcionários de outras unidades do hospital', '37. It is often unpleasant to work with staff from other hospital units.')) /
+(analise_grafica2('41. As unidades do hospital trabalham bem juntas para prestar o melhor atendimento aos pacientes', '41. Hospital units work well together to provide the best care for patients.') + ggplot() + ggplot())
+ggsave("Trabalho em equipe entre as unidades hospitalares2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Trabalho em equipe no âmbito das unidades
+(analise_grafica2('1. As pessoas se apoiam umas às outras nesta unidade', '1. People support one another in this unit.') +
+analise_grafica2('3. Quando há muito trabalho a ser feito e rapidamente, trabalhamos juntos em equipe para realizar a tarefa', '3. When a lot of work needs to be done quickly, we work together as a team to get the work done.') +
+analise_grafica2('4. Nesta unidade, as pessoas se tratam com respeito', '4. In this unit, people treat each other with respect.')) /
+(analise_grafica2('11. Quando uma área nesta unidade fica muito movimentada, as demais ajudam', '11. When one area in this unit gets busy, others help out.') + ggplot() + ggplot())
+ggsave("Trabalho em equipe no âmbito das unidades2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Transferências internas e passagens de plantão
+(analise_grafica2('34. Coisas "escapam por entre os dedos” quando os pacientes são transferidos de uma unidade para outra', '34. Things "fall through the cracks" when patients are transferred from one unit to another.') +
+analise_grafica2('36. Importantes informações sobre a assistência se perdem durante as mudanças de turno', '36. Important information about care gets lost during shift changes.') +
+analise_grafica2('38. Os problemas com frequência ocorrem na troca de informações entre as unidades do hospital', '38. Problems often occur in the exchange of information across hospital units.')) /
+  (analise_grafica2('42. As mudanças de turno são problemáticas para os pacientes deste Hospital', '42. Shift changes are problematic for patients in this Hospital.') + ggplot() + ggplot())
+ggsave("Transferências internas e passagens de plantão2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Aprendizado organizacional - melhoria contínua
+analise_grafica2('6. Estamos ativamente buscando melhorias para a segurança do paciente', '6. We are actively working to improve patient safety.') +
+analise_grafica2('9. Erros que ocorreram levaram a mudanças positivas nesta unidade', '9. Mistakes have led to positive changes in this unit.') +
+analise_grafica2('13. Quando fazemos mudanças para melhorar a segurança do paciente, nós avaliamos sua efetividade', '13. When we make changes to improve patient safety, we evaluate their effectiveness.')
+ggsave("Aprendizado organizacional - melhoria contínua2.png", height=11, width=30, units="cm", dpi= 600)
+
+#Expectativas de promoção da segurança dos supervisores e gerentes
+(analise_grafica2('19. Meu supervisor/gerente elogia quando vê um trabalho feito de acordo com os procedimentos estabelecidos para a segurança do paciente.', '19. My supervisor/manager praises when seeing a job done according to the established procedures for patient safety.') + analise_grafica2('20. Meu supervisor/gerente considera seriamente as sugestões dos funcionários para melhorar a segurança do paciente', '20. My supervisor/manager seriously considers employee suggestions to improve patient safety.') + analise_grafica2('21. Sempre que a pressão aumenta, meu supervisor/gerente quer que trabalhemos mais rápido, mesmo que isto signifique tomar atalhos', '21. Whenever pressure increases, my supervisor/manager wants us to work faster, even if it means taking shortcuts.')) /
+  (analise_grafica2('22. Meu supervisor/gerente ignora problemas recorrentes na segurança do paciente', '22. My supervisor/manager ignores recurring patient safety issues.') + ggplot() + ggplot())
+ggsave("Expectativas de promoção da segurança dos supervisores e gerentes2.png", height=22, width=30, units="cm", dpi= 600)
+
+#Percepção gerais sobre segurança
+(analise_grafica2('10. É apenas por acaso que erros mais sérios não acontecem por aqui', '10. It is just by chance that more serious errors do not happen here.') + analise_grafica2('15. A segurança do paciente nunca é sacrificada em prol de se trabalhar mais', '15. Patient safety is never sacrificed for the sake of working more.') + analise_grafica2('17. Temos problemas com a segurança do paciente nesta unidade', '17. We have problems with patient safety in this unit.')) / 
+  (analise_grafica2('18. Nossos procedimentos e sistemas são bons para impedir que os erros aconteçam', '18. Our procedures and systems are good at preventing errors from happening.') + ggplot() + ggplot())
+ggsave("Percepção gerais sobre segurança2.png", height=22, width=30, units="cm", dpi= 600)
+
+#Respostas não punitivas aos erros
+analise_grafica2('8. Os funcionários sentem que seus erros são usados contra eles', '8. Staff feel that their mistakes are held against them.') +
+analise_grafica2('12. Quando um evento é notificado, sentimos que o foco se concentra no indivíduo, e não no problema', '12. When an event is reported, it feels as if the focus is on the person, not the issue.') +
+analise_grafica2('16. Os funcionários se preocupam que seus erros sejam registrados em seu arquivo funcional', '16. Staff worry that their mistakes are kept in their personnel file.')
+ggsave("Respostas não punitivas aos erros2.png", height=11, width=30, units="cm", dpi= 600)
+
+#Staffing
+(analise_grafica2('2. Temos pessoas suficientes para lidar com o volume de trabalho', '2. We have enough staff to handle the workload.') +
+analise_grafica2('5. Os funcionários desta unidade trabalham mais horas do que o recomendado no atendimento a pacientes', '5. Staff in this unit work longer hours than is best for patient care.') +
+analise_grafica2('7. Utilizamos mais funcionários temporários do que o recomendado no atendimento a paciente', '7. We use more temporary staff than is best for patient care.')) /
+  (analise_grafica2('14. Trabalhamos “em modo de crise”, tentando fazer coisas demais, rápido demais', '14. We work in "crisis mode", trying to do too much, too quickly.') + ggplot() + ggplot())
+ggsave("Staffing2.png", height=22, width=30, units="cm", dpi= 600)
+```
+
+```{r TABELAS}
+#df$acreditacao = ifelse(df$acreditacao == 'No Accreditation', 0, 1)
+
+levels(as.factor(df$acreditacao))
+table(df$acreditacao)
+
+fd <- data.frame(Variable = character(0),
+#                 "Total u" = character(0), "No u" = character(0), "Yes u" = character(0), 
+#                 "t Test" = character(0), "d'Cohen" = character(0), 
+                 "Total Md" = character(0), "No Md" = character(0), "Yes Md" = character(0), 
+                 "MW" = character(0), "Hod-Leh" = character(0),
+                 "Odds MW" = character(0), "LC" = character(0))
+
+for (coluna in lista){
+  if (class(df[[coluna]]) == "numeric"){
+    grupo = df[[coluna]]
+    grupo0 = df[[coluna]][df$acreditacao == "No Accreditation"]
+    grupo1 = df[[coluna]][df$acreditacao == "Accreditation"]
+    
+    #Média
+    ##ut = as.character(rround(mean(grupo, na.rm=T),2))
+    ##u0 = as.character(rround(mean(grupo0, na.rm=T),2))
+    ##u1 = as.character(rround(mean(grupo1, na.rm=T),2))
+    
+    #Desvio Padrão
+    ##sdt = as.character(rround(sd(grupo, na.rm=T),2))
+    ##sd0 = as.character(rround(sd(grupo0, na.rm=T),2))
+    ##sd1 = as.character(rround(sd(grupo1, na.rm=T),2))
+    #concat
+    ##u_sdt = paste0(ut," ± ",sdt)
+    ##u_sd0 = paste0(u0," ± ",sd0)
+    ##u_sd1 = paste0(u1," ± ",sd1)
+    
+    #Tamanho do efeito (parametrico)
+    ##d_cohen <- cohen.d(grupo1,grupo0)
+    ##estimador = as.character(rround(d_cohen$estimate[1],2))
+    ##IC_0 = as.character(rround(d_cohen$conf.int[1],2))
+    ##IC_1 = as.character(rround(d_cohen$conf.int[2],2))
+    ##d_cohen = paste0(estimador," (",IC_0," to ",IC_1,")")
+    
+    #Teste de Hipotese - Teste t
+    ##teste_t = retorne_p(t.test(df[[coluna]]~df$acreditacao, data=df)$p.value)
+
+    #Mediana
+    quartist = quantile(grupo, probs=c(.05/2, .5, 1-.05/2))
+    quartist = round(quartist,2)
+    quartis0 = quantile(grupo0, probs=c(.05/2, .5, 1-.05/2))
+    quartis0 = round(quartis0,2)
+    quartis1 = quantile(grupo1, probs=c(.05/2, .5, 1-.05/2))
+    quartis1 = round(quartis1,2)
+    #concat
+    mdt = paste0(quartist[2],' [',quartist[1],' - ',quartist[3],']')
+    md0 = paste0(quartis0[2],' [',quartis0[1],' - ',quartis0[3],']')
+    md1 = paste0(quartis1[2],' [',quartis1[1],' - ',quartis1[3],']')
+    
+    #Teste de Hipotese - Teste Mann Whitney
+    teste_man = wilcox.test(grupo1,grupo0,conf.int = TRUE)
+    man = retorne_p(teste_man$p.value)
+    
+    #Estimador Hodges Lehmann
+    estimador = as.character(rround(teste_man$estimate,2))
+    IC_00 = as.character(rround(teste_man$conf.int[1],2))
+    IC_01 = as.character(rround(teste_man$conf.int[2],2))
+    hodges_lehmann = paste0(estimador,' (',IC_00,' to ',IC_01,')')
+    
+    #ODDS
+    group1 = grupo1
+    group0 = grupo0
+    test_result <- wilcox.test(group1, group0)
+    U <- test_result$statistic
+    n1 <- length(group1)
+    n2 <- length(group0)
+    wmw_or <- U / (n1 * n2 - U)
+    se_log_wmw_or <- sqrt(1/n1 + 1/n2 + 1/U + 1/(n1*n2 - U))
+    lower_limit <- exp(log(wmw_or) - 1.96 * se_log_wmw_or)
+    lower_limit = as.character(rround(lower_limit,2))
+    upper_limit <- exp(log(wmw_or) + 1.96 * se_log_wmw_or)
+    upper_limit = as.character(rround(upper_limit,2))
+    wmw_or = as.character(rround(wmw_or,2))
+    odds = paste0(wmw_or,' (',lower_limit,' to ',upper_limit,')')
+    
+    #Tamanho do efeito linguagem comum
+    n1 = length(grupo0)
+    n2 = length(grupo1)
+    U1 = teste_man$statistic
+    U2 = n1*n2-U1
+    LC = 100*max(U1,U2)/sum(U1,U2)
+    LC = as.character(rround(LC,2))
+    LC = paste0(LC,"%")
+  
+    fd[nrow(fd)+1,] = c(coluna,
+                        #u_sdt,u_sd0,u_sd1,
+                        #teste_t,d_cohen,
+                        mdt, md0, md1,
+                        man,hodges_lehmann, odds, LC)
+  }
+}
+
+capture(fd)
+
+```
+
+```{r ANALISE PAREADA: FUNÇÃO GRAFICOS BOXPLOT + VIOLINO + JITTER POINTS; GRAFICOS}
+#df$acreditacao = ifelse(df$acreditacao == 1, 'AH', 'No NAH')
+df_progresso = df %>% filter(passou_a_ser_acreditado == 1)
+analise_grafica_pareada = function(coluna, titulo){
+  df_pareado = df_progresso %>% group_by(Unidade, acreditacao) %>% summarise(score = median(!!sym(coluna)))
+  df_pareado$acreditacao = factor(df_pareado$acreditacao, levels = c('NAH', 'AH'))
+  
+  grupo = df_pareado$score
+  grupo0 = df_pareado$score[df_pareado$acreditacao == 'NAH']
+  grupo1 = df_pareado$score[df_pareado$acreditacao == 'AH']
+  
+  #Teste de Hipotese - Teste Mann Whitney
+  teste_man = wilcox.test(grupo1,grupo0,conf.int = TRUE, paired=T)
+  man = retorne_p_ajust(retorne_p(teste_man$p.value))
+
+  #Estimador Hodges Lehmann
+  estimador = as.character(rround(teste_man$estimate,2))
+  IC_00 = as.character(rround(teste_man$conf.int[1],2))
+  IC_01 = as.character(rround(teste_man$conf.int[2],2))
+  hodges_lehmann = paste0(estimador,' [',IC_00,' to ',IC_01,']')
+  
+  texto_dentro_do_grafico = paste0(man)
+  eixo_x = paste0("Median of Differences = ", hodges_lehmann)#, '\nr = ', r)
+
+  ggplot() + 
+    geom_jitter(data=df_pareado, aes(x=as.factor(acreditacao), y=df_pareado$score, fill=as.factor(acreditacao)), 
+                alpha=0.5, size=2.5, position=position_jitter(0.25)) + 
+    geom_violin(data=df_pareado, aes(x=as.factor(acreditacao), y=df_pareado$score, fill=as.factor(acreditacao)), 
+                show.legend = F, alpha=0.2) + 
+    geom_boxplot(data=df_pareado, aes(x=as.factor(acreditacao), y=df_pareado$score, fill=as.factor(acreditacao)), 
+                 alpha=0.90, show.legend = F, width = 0.5, fill = 'white') + 
+    annotate("text", x = 1.5, y = max(df_pareado$score,na.rm = T), 
+             label = texto_dentro_do_grafico, vjust = 0.7, size = 4, color = "black") +
+    labs(y='Score (%)', title=adicionar_quebra_de_linha(titulo, 38), x=eixo_x) + 
+    theme(axis.title=element_text(size=9), 
+          legend.position = "none", axis.line = element_line(colour = "black")) +
+    theme_bw() + theme(legend.position="none") + 
+    scale_y_continuous(breaks=seq(from = 0, 
+                                  to = max(df_pareado$score,na.rm = T), 
+                                  by = round((max(df_pareado$score,na.rm = T) - min(df_pareado$score,na.rm = T))/10, 1)),
+                       limits = c(min(df_pareado$score,na.rm = T), max(df_pareado$score,na.rm = T))) +
+    theme(axis.title.x = element_text(size = 11),
+          axis.title.y = element_text(size = 11))
+}
+
+##############################################################################################
+#GERAL
+(analise_grafica_pareada('Abertura de comunicação', 'Open communication') + analise_grafica_pareada('Feedback e comunicação sobre erros', 'Feedback and communication about errors') + analise_grafica_pareada('Frequência de eventos relatados', 'Frequency of reported events')) /
+  (analise_grafica_pareada('Apoio de gestão hospitalar para segurança do paciente', 'Hospital management support for patient safety') + analise_grafica_pareada('Trabalho em equipe entre as unidades hospitalares', 'Teamwork between hospital units') + analise_grafica_pareada('Trabalho em equipe no âmbito das unidades', 'Teamwork within units')) /
+  (analise_grafica_pareada('Transferências internas e passagens de plantão', 'Internal transfers and shift changes') + analise_grafica_pareada('Aprendizado organizacional - melhoria contínua', 'Organizational learning - continuous improvement') + analise_grafica_pareada('Expectativas de promoção da segurança dos supervisores e gerentes', 'Expectations for promoting safety by supervisors and managers')) /
+  (analise_grafica_pareada('Percepção gerais sobre segurança', 'General perceptions about safety') + analise_grafica_pareada('Respostas não punitivas aos erros', 'Non-punitive responses to errors') + analise_grafica_pareada('Staffing', 'Staffing'))
+ggsave("Agrupamentos2.png", height=44, width=30, units="cm", dpi=600)
+
+# Abertura de comunicação
+analise_grafica_pareada('24. Os funcionários falam voluntariamente se vêem algo que possa afetar negativamente o atendimento aos pacientes', '24. Employees voluntarily speak up if they see something that may negatively affect patient care') + 
+analise_grafica_pareada('26. Os funcionários sentem-se à vontade para questionar decisões ou ações dos que têm mais autoridade', '26. Staff feel free to question the decisions or actions of those with more authority') + 
+analise_grafica_pareada('28. Os funcionários têm receio de perguntar quando algo não parece certo', '28. Staff are afraid to ask when something does not look right')
+ggsave("Abertura de comunicação2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Feedback e comunicação sobre erros
+analise_grafica_pareada('23. Recebemos feedback das mudanças implementadas com base nos eventos notificados', '23. We are given feedback about changes put into place based on event reports') +
+analise_grafica_pareada('25. Somos informados sobre os erros que acontecem nesta unidade', '25. We are informed about errors that happen in this unit') +
+analise_grafica_pareada('27. Nesta unidade, discutimos maneiras de impedir que os erros tornem a acontecer', '27. In this unit, we discuss ways to prevent errors from happening again')
+ggsave("Feedback e comunicação sobre erros2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Frequência de eventos relatados
+analise_grafica_pareada('29. Quando acontece um erro, mas ele é identificado e corrigido antes de afetar o paciente, com que frequência é notificado?', '29. When a mistake is made, but is caught and corrected before affecting the patient, how often is this reported?') +
+analise_grafica_pareada('30. Quando acontece um erro, mas que não tem potencial de dano ao paciente, com que frequência é notificado?', '30. When a mistake is made, but has no potential to harm the patient, how often is this reported?') +
+analise_grafica_pareada('31. Quando acontece um erro que poderia prejudicar o paciente, mas isto não ocorreu, com que frequência é notificado?', '31. When a mistake is made that could harm the patient, but does not, how often is this reported?')
+ggsave("Frequencia de eventos relatados2.png", height=13, width=30, units="cm", dpi= 600)
+
+# Apoio de gestão hospitalar para segurança do paciente
+analise_grafica_pareada('32. A administração do hospital cria um ambiente de trabalho que promove a segurança do paciente', '32. Hospital management supports my daily efforts to keep patients safe') +
+analise_grafica_pareada('39. As ações da administração do hospital mostram que a segurança do paciente é uma prioridade máxima', '39. Hospital management is doing a good job of keeping patient safety a top priority') +
+analise_grafica_pareada('40. A administração do hospital parece se interessar pela segurança do paciente apenas quando acontece um evento adverso', '40. Hospital management seems interested in patient safety only after an adverse event happens')
+ggsave("Apoio de gestão hospitalar para seguraça do paciente2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Trabalho em equipe entre as unidades hospitalares
+(analise_grafica_pareada('33. As unidades hospitalares não se coordenam bem entre si.', '33. Hospital units do not coordinate well with each other.') +
+analise_grafica_pareada('35. Existe uma boa cooperação entre as unidades hospitalares que precisam trabalhar juntas', '35. There is good cooperation among hospital units that need to work together.') +
+analise_grafica_pareada('37. Muitas vezes é desagradável trabalhar unidades com funcionários de outras unidades do hospital', '37. It is often unpleasant to work with staff from other hospital units.')) /
+(analise_grafica_pareada('41. As unidades do hospital trabalham bem juntas para prestar o melhor atendimento aos pacientes', '41. Hospital units work well together to provide the best care for patients.') + ggplot() + ggplot())
+ggsave("Trabalho em equipe entre as unidades hospitalares2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Trabalho em equipe no âmbito das unidades
+(analise_grafica_pareada('1. As pessoas se apoiam umas às outras nesta unidade', '1. People support one another in this unit.') +
+analise_grafica_pareada('3. Quando há muito trabalho a ser feito e rapidamente, trabalhamos juntos em equipe para realizar a tarefa', '3. When a lot of work needs to be done quickly, we work together as a team to get the work done.') +
+analise_grafica_pareada('4. Nesta unidade, as pessoas se tratam com respeito', '4. In this unit, people treat each other with respect.')) /
+(analise_grafica_pareada('11. Quando uma área nesta unidade fica muito movimentada, as demais ajudam', '11. When one area in this unit gets busy, others help out.') + ggplot() + ggplot())
+ggsave("Trabalho em equipe no âmbito das unidades2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Transferências internas e passagens de plantão
+(analise_grafica_pareada('34. Coisas "escapam por entre os dedos” quando os pacientes são transferidos de uma unidade para outra', '34. Things "fall through the cracks" when patients are transferred from one unit to another.') +
+analise_grafica_pareada('36. Importantes informações sobre a assistência se perdem durante as mudanças de turno', '36. Important information about care gets lost during shift changes.') +
+analise_grafica_pareada('38. Os problemas com frequência ocorrem na troca de informações entre as unidades do hospital', '38. Problems often occur in the exchange of information across hospital units.')) /
+  (analise_grafica_pareada('42. As mudanças de turno são problemáticas para os pacientes deste Hospital', '42. Shift changes are problematic for patients in this Hospital.') + ggplot() + ggplot())
+ggsave("Transferências internas e passagens de plantão2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Aprendizado organizacional - melhoria contínua
+analise_grafica_pareada('6. Estamos ativamente buscando melhorias para a segurança do paciente', '6. We are actively working to improve patient safety.') +
+analise_grafica_pareada('9. Erros que ocorreram levaram a mudanças positivas nesta unidade', '9. Mistakes have led to positive changes in this unit.') +
+analise_grafica_pareada('13. Quando fazemos mudanças para melhorar a segurança do paciente, nós avaliamos sua efetividade', '13. When we make changes to improve patient safety, we evaluate their effectiveness.')
+ggsave("Aprendizado organizacional - melhoria contínua2.png", height=11, width=30, units="cm", dpi= 600)
+
+#Expectativas de promoção da segurança dos supervisores e gerentes
+(analise_grafica_pareada('19. Meu supervisor/gerente elogia quando vê um trabalho feito de acordo com os procedimentos estabelecidos para a segurança do paciente.', '19. My supervisor/manager praises when seeing a job done according to the established procedures for patient safety.') + analise_grafica_pareada('20. Meu supervisor/gerente considera seriamente as sugestões dos funcionários para melhorar a segurança do paciente', '20. My supervisor/manager seriously considers employee suggestions to improve patient safety.') + analise_grafica_pareada('21. Sempre que a pressão aumenta, meu supervisor/gerente quer que trabalhemos mais rápido, mesmo que isto signifique tomar atalhos', '21. Whenever pressure increases, my supervisor/manager wants us to work faster, even if it means taking shortcuts.')) /
+  (analise_grafica_pareada('22. Meu supervisor/gerente ignora problemas recorrentes na segurança do paciente', '22. My supervisor/manager ignores recurring patient safety issues.') + ggplot() + ggplot())
+ggsave("Expectativas de promoção da segurança dos supervisores e gerentes2.png", height=22, width=30, units="cm", dpi= 600)
+
+#Percepção gerais sobre segurança
+(analise_grafica_pareada('10. É apenas por acaso que erros mais sérios não acontecem por aqui', '10. It is just by chance that more serious errors do not happen here.') + analise_grafica_pareada('15. A segurança do paciente nunca é sacrificada em prol de se trabalhar mais', '15. Patient safety is never sacrificed for the sake of working more.') + analise_grafica_pareada('17. Temos problemas com a segurança do paciente nesta unidade', '17. We have problems with patient safety in this unit.')) / 
+  (analise_grafica_pareada('18. Nossos procedimentos e sistemas são bons para impedir que os erros aconteçam', '18. Our procedures and systems are good at preventing errors from happening.') + ggplot() + ggplot())
+ggsave("Percepção gerais sobre segurança2.png", height=22, width=30, units="cm", dpi= 600)
+
+#Respostas não punitivas aos erros
+analise_grafica_pareada('8. Os funcionários sentem que seus erros são usados contra eles', '8. Staff feel that their mistakes are held against them.') +
+analise_grafica_pareada('12. Quando um evento é notificado, sentimos que o foco se concentra no indivíduo, e não no problema', '12. When an event is reported, it feels as if the focus is on the person, not the issue.') +
+analise_grafica_pareada('16. Os funcionários se preocupam que seus erros sejam registrados em seu arquivo funcional', '16. Staff worry that their mistakes are kept in their personnel file.')
+ggsave("Respostas não punitivas aos erros2.png", height=11, width=30, units="cm", dpi= 600)
+
+#Staffing
+(analise_grafica_pareada('2. Temos pessoas suficientes para lidar com o volume de trabalho', '2. We have enough staff to handle the workload.') +
+analise_grafica_pareada('5. Os funcionários desta unidade trabalham mais horas do que o recomendado no atendimento a pacientes', '5. Staff in this unit work longer hours than is best for patient care.') +
+analise_grafica_pareada('7. Utilizamos mais funcionários temporários do que o recomendado no atendimento a paciente', '7. We use more temporary staff than is best for patient care.')) /
+  (analise_grafica_pareada('14. Trabalhamos “em modo de crise”, tentando fazer coisas demais, rápido demais', '14. We work in "crisis mode", trying to do too much, too quickly.') + ggplot() + ggplot())
+ggsave("Staffing2.png", height=22, width=30, units="cm", dpi= 600)
+```
+
+```{r ANALISE PAREADA: TABELAS (PRÉ)}
+df_progresso = df %>% filter(passou_a_ser_acreditado == 1)
+
+analise_grafica_pareada = function(coluna){
+  df_pareado = df_progresso %>% group_by(Unidade, acreditacao) %>% summarise(score = median(!!sym(coluna)))
+  
+  #df_pareado$acreditacao = ifelse(df_pareado$acreditacao == 1, 'Accreditation', 'No Accreditation')
+  colnames(df_pareado)[colnames(df_pareado) == 'score'] <- coluna
+  df_pareado
+}
+
+df_pareado_total = df_progresso %>% group_by(Unidade, acreditacao) %>% summarise(score = median(Staffing))
+#df_pareado_total$acreditacao = ifelse(df_pareado_total$acreditacao == 1, 'Accreditation', 'No Accreditation')
+for (coluna in lista){
+  if (class(df[[coluna]]) == "numeric"){
+    df1 = analise_grafica_pareada(coluna)
+    df_pareado_total = left_join(df_pareado_total, df1, by = c("Unidade", "acreditacao"))
+  }
+}
+
+nrow(df_pareado_total)
+
+```
+
+```{r ANALISE PAREADA: TABELAS (PÓS)}
+fd <- data.frame(Variable = character(0),
+                 #"Total u" = character(0), "No u" = character(0), "Yes u" = character(0), 
+                 #"t Test" = character(0), "d'Cohen" = character(0), 
+                 "Total Md" = character(0), "No Md" = character(0), "Yes Md" = character(0), 
+                 "MW" = character(0), "Hod-Leh" = character(0),
+                 #"Odds MW" = character(0), 
+                 "LC" = character(0))
+
+for (coluna in lista){
+  if (class(df_pareado_total[[coluna]]) == "numeric"){
+    grupo = df_pareado_total[[coluna]]
+    grupo0 = df_pareado_total[[coluna]][df_pareado_total$acreditacao == "NAH"]
+    grupo1 = df_pareado_total[[coluna]][df_pareado_total$acreditacao == "AH"]
+    
+    #Média
+    ##ut = as.character(rround(mean(grupo, na.rm=T),2))
+    ##u0 = as.character(rround(mean(grupo0, na.rm=T),2))
+    ##u1 = as.character(rround(mean(grupo1, na.rm=T),2))
+    
+    #Desvio Padrão
+    ##sdt = as.character(rround(sd(grupo, na.rm=T),2))
+    ##sd0 = as.character(rround(sd(grupo0, na.rm=T),2))
+    ##sd1 = as.character(rround(sd(grupo1, na.rm=T),2))
+    #concat
+    ##u_sdt = paste0(ut," ± ",sdt)
+    ##u_sd0 = paste0(u0," ± ",sd0)
+    ##u_sd1 = paste0(u1," ± ",sd1)
+    
+    #Tamanho do efeito (parametrico)
+    ##d_cohen <- cohen.d(grupo1,grupo0)
+    ##estimador = as.character(rround(d_cohen$estimate[1],2))
+    ##IC_0 = as.character(rround(d_cohen$conf.int[1],2))
+    ##IC_1 = as.character(rround(d_cohen$conf.int[2],2))
+    ##d_cohen = paste0(estimador," (",IC_0," to ",IC_1,")")
+    
+    #Teste de Hipotese - Teste t
+    ##teste_t = retorne_p(t.test(df_pareado_total[[coluna]]~df_pareado_total$acreditacao, data=df_pareado_total)$p.value)
+
+    #Mediana
+    quartist = quantile(grupo, probs=c(.05/2, .5, 1-.05/2))
+    quartist = round(quartist,2)
+    quartis0 = quantile(grupo0, probs=c(.05/2, .5, 1-.05/2))
+    quartis0 = round(quartis0,2)
+    quartis1 = quantile(grupo1, probs=c(.05/2, .5, 1-.05/2))
+    quartis1 = round(quartis1,2)
+    #concat
+    mdt = paste0(quartist[2],' [',quartist[1],' - ',quartist[3],']')
+    md0 = paste0(quartis0[2],' [',quartis0[1],' - ',quartis0[3],']')
+    md1 = paste0(quartis1[2],' [',quartis1[1],' - ',quartis1[3],']')
+    
+    #Teste de Hipotese - Teste Mann Whitney
+    teste_man = wilcox.test(grupo1,grupo0, conf.int = TRUE, paired = TRUE)
+    man = retorne_p(teste_man$p.value)
+    
+    #Estimador Hodges Lehmann
+    estimador = as.character(rround(teste_man$estimate,2))
+    IC_00 = as.character(rround(teste_man$conf.int[1],2))
+    IC_01 = as.character(rround(teste_man$conf.int[2],2))
+    hodges_lehmann = paste0(estimador,' (',IC_00,' to ',IC_01,')')
+    
+    #ODDS
+    ##test_result <- wilcox.test(group1, group0, paired = TRUE)
+    ##U <- test_result$statistic
+    ##n1 <- length(group1)
+    ##n2 <- length(group0)
+    ##wmw_or <- U / (n1 * n2 - U)
+    ##se_log_wmw_or <- sqrt(1/n1 + 1/n2 + 1/U + 1/(n1*n2 - U))
+    ##lower_limit <- exp(log(wmw_or) - 1.96 * se_log_wmw_or)
+    ##lower_limit = as.character(rround(lower_limit,2))
+    ##upper_limit <- exp(log(wmw_or) + 1.96 * se_log_wmw_or)
+    ##upper_limit = as.character(rround(upper_limit,2))
+    ##wmw_or = as.character(rround(wmw_or,2))
+    ##odds = paste0(wmw_or,' (',lower_limit,' to ',upper_limit,')')
+    
+    #Tamanho do efeito linguagem comum
+    n1 = length(grupo0)
+    n2 = length(grupo1)
+    U1 = teste_man$statistic
+    U2 = n1*n2-U1
+    LC = 100*max(U1,U2)/sum(U1,U2)
+    LC = as.character(rround(LC,2))
+    LC = paste0(LC,"%")
+  
+    fd[nrow(fd)+1,] = c(coluna,
+                        #u_sdt,u_sd0,u_sd1,
+                        #teste_t,d_cohen,
+                        mdt, md0, md1,
+                        man, hodges_lehmann, 
+                        #odds, 
+                        LC)
+  }
+}
+
+capture(fd)
+```
+
+```{r}
+df_ano <- read_excel("3 - Dados_Score_Ano_vs_Acreditacao.xlsx")
+df_ano
+df = df_ano
+```
+
+```{r ANALISE POR ANO PAREADO: TABELAS}
+fd <- data.frame(Variable = character(0),
+                 #"Total u" = character(0), "No u" = character(0), "Yes u" = character(0), 
+                 #"t Test" = character(0), "d'Cohen" = character(0), 
+                 "Total Md" = character(0), "No Md" = character(0), "Yes Md" = character(0), 
+                 "MW" = character(0), "Hod-Leh" = character(0),
+                 #"Odds MW" = character(0), 
+                 "LC" = character(0))
+
+for (coluna in lista){
+  if (class(df_ano[[coluna]]) == "numeric"){
+    grupo = df_ano[[coluna]]
+    grupo0 = df_ano[[coluna]][df_ano$acreditacao == 0]
+    grupo1 = df_ano[[coluna]][df_ano$acreditacao == 1]
+    
+    #Média
+    ##ut = as.character(rround(mean(grupo, na.rm=T),2))
+    ##u0 = as.character(rround(mean(grupo0, na.rm=T),2))
+    ##u1 = as.character(rround(mean(grupo1, na.rm=T),2))
+    
+    #Desvio Padrão
+    ##sdt = as.character(rround(sd(grupo, na.rm=T),2))
+    ##sd0 = as.character(rround(sd(grupo0, na.rm=T),2))
+    ##sd1 = as.character(rround(sd(grupo1, na.rm=T),2))
+    #concat
+    ##u_sdt = paste0(ut," ± ",sdt)
+    ##u_sd0 = paste0(u0," ± ",sd0)
+    ##u_sd1 = paste0(u1," ± ",sd1)
+    
+    #Tamanho do efeito (parametrico)
+    ##d_cohen <- cohen.d(grupo1,grupo0, paired = TRUE)
+    ##estimador = as.character(rround(d_cohen$estimate[1],2))
+    ##IC_0 = as.character(rround(d_cohen$conf.int[1],2))
+    ##IC_1 = as.character(rround(d_cohen$conf.int[2],2))
+    ##d_cohen = paste0(estimador," (",IC_0," to ",IC_1,")")
+    
+    #Teste de Hipotese - Teste t
+    ##teste_t = retorne_p(t.test(df_ano[[coluna]]~df_ano$acreditacao, data=df_ano, paired = TRUE)$p.value)
+
+    #Mediana
+    quartist = quantile(grupo, probs=c(.05/2, .5, 1-.05/2))
+    quartist = round(quartist,2)
+    quartis0 = quantile(grupo0, probs=c(.05/2, .5, 1-.05/2))
+    quartis0 = round(quartis0,2)
+    quartis1 = quantile(grupo1, probs=c(.05/2, .5, 1-.05/2))
+    quartis1 = round(quartis1,2)
+    #concat
+    mdt = paste0(quartist[2],' [',quartist[1],' - ',quartist[3],']')
+    md0 = paste0(quartis0[2],' [',quartis0[1],' - ',quartis0[3],']')
+    md1 = paste0(quartis1[2],' [',quartis1[1],' - ',quartis1[3],']')
+    
+    #Teste de Hipotese - Teste Mann Whitney
+    teste_man = wilcox.test(grupo1,grupo0,conf.int = TRUE, paired = TRUE)
+    man = retorne_p(teste_man$p.value)
+    
+    #Estimador Hodges Lehmann
+    estimador = as.character(rround(teste_man$estimate,2))
+    IC_00 = as.character(rround(teste_man$conf.int[1],2))
+    IC_01 = as.character(rround(teste_man$conf.int[2],2))
+    hodges_lehmann = paste0(estimador,' (',IC_00,' to ',IC_01,')')
+    
+    #Coeficiente r
+    ##df_ano[[coluna]] = 1 - df_ano[[coluna]]
+    ##teste = wilcoxonR(df_ano[[coluna]], g=df_ano$acreditacao, ci=T, paired = TRUE)
+    ##df_ano[[coluna]] = 1 - df_ano[[coluna]]
+    ##r = as.character(rround(teste[1],2))
+    ##r_ic0 = as.character(rround(teste[2],2))
+    ##r_ic1 = as.character(rround(teste[3],2))
+    ##r = paste0(r,' (',r_ic0,' to ',r_ic1,')')
+    
+    #ODDS
+    ##test_result <- wilcox.test(group1, group0, paired = TRUE)
+    ##U <- test_result$statistic
+    ##n1 <- length(group1)
+    ##n2 <- length(group0)
+    ##wmw_or <- U / (n1 * n2 - U)
+    ##se_log_wmw_or <- sqrt(1/n1 + 1/n2 + 1/U + 1/(n1*n2 - U))
+    ##lower_limit <- exp(log(wmw_or) - 1.96 * se_log_wmw_or)
+    ##lower_limit = as.character(rround(lower_limit,2))
+    ##upper_limit <- exp(log(wmw_or) + 1.96 * se_log_wmw_or)
+    ##upper_limit = as.character(rround(upper_limit,2))
+    ##wmw_or = as.character(rround(wmw_or,2))
+    ##odds = paste0(wmw_or,' (',lower_limit,' to ',upper_limit,')')
+    
+    #Tamanho do efeito linguagem comum
+    n1 = length(grupo0)
+    n2 = length(grupo1)
+    U1 = teste_man$statistic
+    U2 = n1*n2-U1
+    LC = 100*max(U1,U2)/sum(U1,U2)
+    LC = as.character(rround(LC,2))
+    LC = paste0(LC,"%")
+    
+    fd[nrow(fd)+1,] = c(coluna,
+                        #u_sdt,u_sd0,u_sd1,
+                        #teste_t,d_cohen,
+                        mdt, md0, md1,
+                        man, hodges_lehmann, 
+                        #odds, 
+                        LC) 
+  }
+}
+
+capture(fd)
+```
+
+```{r ANALISE POR ANO}
+fd <- data.frame(Variable = character(0),
+                 #"Total u" = character(0), "No u" = character(0), "Yes u" = character(0), 
+                 #"t Test" = character(0), "d'Cohen" = character(0), 
+                 "Total Md" = character(0), "No Md" = character(0), "Yes Md" = character(0), 
+                 "MW" = character(0), "Hod-Leh" = character(0),
+                 #"Odds MW" = character(0), 
+                 "LC" = character(0))
+
+for (coluna in lista){
+  if (class(df_ano[[coluna]]) == "numeric"){
+    grupo = df_ano[[coluna]]
+    grupo0 = df_ano[[coluna]][df_ano$acreditacao == 0]
+    grupo1 = df_ano[[coluna]][df_ano$acreditacao == 1]
+    
+    #Média
+    ##ut = as.character(rround(mean(grupo, na.rm=T),2))
+    ##u0 = as.character(rround(mean(grupo0, na.rm=T),2))
+    ##u1 = as.character(rround(mean(grupo1, na.rm=T),2))
+    
+    #Desvio Padrão
+    ##sdt = as.character(rround(sd(grupo, na.rm=T),2))
+    ##sd0 = as.character(rround(sd(grupo0, na.rm=T),2))
+    ##sd1 = as.character(rround(sd(grupo1, na.rm=T),2))
+    #concat
+    ##u_sdt = paste0(ut," ± ",sdt)
+    ##u_sd0 = paste0(u0," ± ",sd0)
+    ##u_sd1 = paste0(u1," ± ",sd1)
+    
+    #Tamanho do efeito (parametrico)
+    ##d_cohen <- cohen.d(grupo1,grupo0, paired = TRUE)
+    ##estimador = as.character(rround(d_cohen$estimate[1],2))
+    ##IC_0 = as.character(rround(d_cohen$conf.int[1],2))
+    ##IC_1 = as.character(rround(d_cohen$conf.int[2],2))
+    ##d_cohen = paste0(estimador," (",IC_0," to ",IC_1,")")
+    
+    #Teste de Hipotese - Teste t
+    ##teste_t = retorne_p(t.test(df_ano[[coluna]]~df_ano$acreditacao, data=df_ano, paired = TRUE)$p.value)
+
+    #Mediana
+    quartist = quantile(grupo, probs=c(.05/2, .5, 1-.05/2))
+    quartist = round(quartist,2)
+    quartis0 = quantile(grupo0, probs=c(.05/2, .5, 1-.05/2))
+    quartis0 = round(quartis0,2)
+    quartis1 = quantile(grupo1, probs=c(.05/2, .5, 1-.05/2))
+    quartis1 = round(quartis1,2)
+    #concat
+    mdt = paste0(quartist[2],' [',quartist[1],' - ',quartist[3],']')
+    md0 = paste0(quartis0[2],' [',quartis0[1],' - ',quartis0[3],']')
+    md1 = paste0(quartis1[2],' [',quartis1[1],' - ',quartis1[3],']')
+    
+    #Teste de Hipotese - Teste Mann Whitney
+    teste_man = wilcox.test(grupo1, grupo0, conf.int = TRUE)
+    man = retorne_p(teste_man$p.value)
+    
+    #Estimador Hodges Lehmann
+    estimador = as.character(rround(teste_man$estimate,2))
+    IC_00 = as.character(rround(teste_man$conf.int[1],2))
+    IC_01 = as.character(rround(teste_man$conf.int[2],2))
+    hodges_lehmann = paste0(estimador,' (',IC_00,' to ',IC_01,')')
+    
+    #Coeficiente r
+    ##df_ano[[coluna]] = 1 - df_ano[[coluna]]
+    ##teste = wilcoxonR(df_ano[[coluna]], g=df_ano$acreditacao, ci=T, paired = TRUE)
+    ##df_ano[[coluna]] = 1 - df_ano[[coluna]]
+    ##r = as.character(rround(teste[1],2))
+    ##r_ic0 = as.character(rround(teste[2],2))
+    ##r_ic1 = as.character(rround(teste[3],2))
+    ##r = paste0(r,' (',r_ic0,' to ',r_ic1,')')
+    
+    #ODDS
+    ##test_result <- wilcox.test(group1, group0, paired = TRUE)
+    ##U <- test_result$statistic
+    ##n1 <- length(group1)
+    ##n2 <- length(group0)
+    ##wmw_or <- U / (n1 * n2 - U)
+    ##se_log_wmw_or <- sqrt(1/n1 + 1/n2 + 1/U + 1/(n1*n2 - U))
+    ##lower_limit <- exp(log(wmw_or) - 1.96 * se_log_wmw_or)
+    ##lower_limit = as.character(rround(lower_limit,2))
+    ##upper_limit <- exp(log(wmw_or) + 1.96 * se_log_wmw_or)
+    ##upper_limit = as.character(rround(upper_limit,2))
+    ##wmw_or = as.character(rround(wmw_or,2))
+    ##odds = paste0(wmw_or,' (',lower_limit,' to ',upper_limit,')')
+    
+    #Tamanho do efeito linguagem comum
+    n1 = length(grupo0)
+    n2 = length(grupo1)
+    U1 = teste_man$statistic
+    U2 = n1*n2-U1
+    LC = 100*max(U1,U2)/sum(U1,U2)
+    LC = as.character(rround(LC,2))
+    LC = paste0(LC,"%")
+    
+    fd[nrow(fd)+1,] = c(coluna,
+                        #u_sdt,u_sd0,u_sd1,
+                        #teste_t,d_cohen,
+                        mdt, md0, md1,
+                        man, hodges_lehmann, 
+                        #odds, 
+                        LC) 
+  }
+}
+
+capture(fd)
+```
+
+##############################################################################################################3
+
+```{r GERAL ANALISE DE TENDENCIA: FUNÇÃO GRAFICOS LINHA + JITTER + BOXPLOT}
+analise_grafica2 = function(coluna, titulo){
+  df_filter1 = df
+  
+  #p1 = retorne_p_ajust(retorne_p(summary(lm(df_filter1[[coluna]]~Ano, data=df_filter1))$coefficients[2, "Pr(>|t|)"]))
+  p1 = retorne_p_ajust(retorne_p(summary(lmer(df_filter1[[coluna]] ~ Ano + (1 | Unidade), data = df_filter1))$coefficients[2, "Pr(>|t|)"]))
+  
+  #subtitulo = paste0("Overall (", p1,")")
+  subtitulo = paste0(p1)
+  
+  ggplot() +
+    geom_jitter(data=df, aes(x=Ano, y=df[[coluna]], color=as.factor(Ano)), alpha=0.5, size=2.5, position=position_jitter(0.25)) + 
+    geom_boxplot(data=df, aes(x=Ano, y=df[[coluna]], color=as.factor(Ano)), alpha=0.5, fill = 'white') + 
+    geom_smooth(data=df, aes(x=Ano, y=df[[coluna]]), method = lm, color = "black") + 
+    scale_x_continuous(breaks=seq(from=min(df$Ano), to=max(df$Ano), by=1)) +
+    scale_y_continuous(breaks=seq(from=as.integer(min(df[[coluna]])), 
+                                  to=as.integer(max(df[[coluna]])), 
+                                  by=as.integer((max(df[[coluna]]) - min(df[[coluna]]))/6))) +
+    theme(axis.title=element_text(size=9), 
+          legend.position = "none", axis.line = element_line(colour = "black")) + 
+    theme_bw() +
+    theme(legend.position="none") + 
+    labs(subtitle=subtitulo, title=adicionar_quebra_de_linha(titulo), y='Score (%)', x='Year')
+} 
+
+analise_grafica2('Abertura de comunicação', 'Open communication')
+
+
+##### GRAFICOS GERADOS
+#GERAL
+(analise_grafica2('Abertura de comunicação', 'Open communication') + analise_grafica2('Feedback e comunicação sobre erros', 'Feedback and communication about errors') + analise_grafica2('Frequência de eventos relatados', 'Frequency of reported events')) /
+  (analise_grafica2('Apoio de gestão hospitalar para segurança do paciente', 'Hospital management support for patient safety') + analise_grafica2('Trabalho em equipe entre as unidades hospitalares', 'Teamwork between hospital units') + analise_grafica2('Trabalho em equipe no âmbito das unidades', 'Teamwork within units')) /
+  (analise_grafica2('Transferências internas e passagens de plantão', 'Internal transfers and shift changes') + analise_grafica2('Aprendizado organizacional - melhoria contínua', 'Organizational learning - continuous improvement') + analise_grafica2('Expectativas de promoção da segurança dos supervisores e gerentes', 'Expectations for promoting safety by supervisors and managers')) /
+  (analise_grafica2('Percepção gerais sobre segurança', 'General perceptions about safety') + analise_grafica2('Respostas não punitivas aos erros', 'Non-punitive responses to errors') + analise_grafica2('Staffing', 'Staffing'))
+ggsave("Agrupamentos2.png", height=30, width=30, units="cm", dpi=600)
+
+# Abertura de comunicação
+analise_grafica2('24. Os funcionários falam voluntariamente se vêem algo que possa afetar negativamente o atendimento aos pacientes', '24. Employees voluntarily speak up if they see something that may negatively affect patient care') + 
+analise_grafica2('26. Os funcionários sentem-se à vontade para questionar decisões ou ações dos que têm mais autoridade', '26. Staff feel free to question the decisions or actions of those with more authority') + 
+analise_grafica2('28. Os funcionários têm receio de perguntar quando algo não parece certo', '28. Staff are afraid to ask when something does not look right')
+ggsave("Abertura de comunicação2.png", height=9, width=30, units="cm", dpi= 600)
+
+# Feedback e comunicação sobre erros
+analise_grafica2('23. Recebemos feedback das mudanças implementadas com base nos eventos notificados', '23. We are given feedback about changes put into place based on event reports') +
+analise_grafica2('25. Somos informados sobre os erros que acontecem nesta unidade', '25. We are informed about errors that happen in this unit') +
+analise_grafica2('27. Nesta unidade, discutimos maneiras de impedir que os erros tornem a acontecer', '27. In this unit, we discuss ways to prevent errors from happening again')
+ggsave("Feedback e comunicação sobre erros2.png", height=9, width=30, units="cm", dpi= 600)
+
+# Frequência de eventos relatados
+analise_grafica2('29. Quando acontece um erro, mas ele é identificado e corrigido antes de afetar o paciente, com que frequência é notificado?', '29. When a mistake is made, but is caught and corrected before affecting the patient, how often is this reported?') +
+analise_grafica2('30. Quando acontece um erro, mas que não tem potencial de dano ao paciente, com que frequência é notificado?', '30. When a mistake is made, but has no potential to harm the patient, how often is this reported?') +
+analise_grafica2('31. Quando acontece um erro que poderia prejudicar o paciente, mas isto não ocorreu, com que frequência é notificado?', '31. When a mistake is made that could harm the patient, but does not, how often is this reported?')
+ggsave("Frequencia de eventos relatados2.png", height=9, width=30, units="cm", dpi= 600)
+
+# Apoio de gestão hospitalar para segurança do paciente
+analise_grafica2('32. A administração do hospital cria um ambiente de trabalho que promove a segurança do paciente', '32. Hospital management supports my daily efforts to keep patients safe') +
+analise_grafica2('39. As ações da administração do hospital mostram que a segurança do paciente é uma prioridade máxima', '39. Hospital management is doing a good job of keeping patient safety a top priority') +
+analise_grafica2('40. A administração do hospital parece se interessar pela segurança do paciente apenas quando acontece um evento adverso', '40. Hospital management seems interested in patient safety only after an adverse event happens')
+ggsave("Apoio de gestão hospitalar para seguraça do paciente2.png", height=9, width=30, units="cm", dpi= 600)
+
+# Trabalho em equipe entre as unidades hospitalares
+(analise_grafica2('33. As unidades hospitalares não se coordenam bem entre si.', '33. Hospital units do not coordinate well with each other.') +
+analise_grafica2('35. Existe uma boa cooperação entre as unidades hospitalares que precisam trabalhar juntas', '35. There is good cooperation among hospital units that need to work together.') +
+analise_grafica2('37. Muitas vezes é desagradável trabalhar unidades com funcionários de outras unidades do hospital', '37. It is often unpleasant to work with staff from other hospital units.')) /
+(analise_grafica2('41. As unidades do hospital trabalham bem juntas para prestar o melhor atendimento aos pacientes', '41. Hospital units work well together to provide the best care for patients.') + ggplot() + ggplot())
+ggsave("Trabalho em equipe entre as unidades hospitalares2.png", height=18, width=30, units="cm", dpi= 600)
+
+# Trabalho em equipe no âmbito das unidades
+(analise_grafica2('1. As pessoas se apoiam umas às outras nesta unidade', '1. People support one another in this unit.') +
+analise_grafica2('3. Quando há muito trabalho a ser feito e rapidamente, trabalhamos juntos em equipe para realizar a tarefa', '3. When a lot of work needs to be done quickly, we work together as a team to get the work done.') +
+analise_grafica2('4. Nesta unidade, as pessoas se tratam com respeito', '4. In this unit, people treat each other with respect.')) /
+(analise_grafica2('11. Quando uma área nesta unidade fica muito movimentada, as demais ajudam', '11. When one area in this unit gets busy, others help out.') + ggplot() + ggplot())
+ggsave("Trabalho em equipe no âmbito das unidades2.png", height=18, width=30, units="cm", dpi= 600)
+
+# Transferências internas e passagens de plantão
+(analise_grafica2('34. Coisas "escapam por entre os dedos” quando os pacientes são transferidos de uma unidade para outra', '34. Things "fall through the cracks" when patients are transferred from one unit to another.') +
+analise_grafica2('36. Importantes informações sobre a assistência se perdem durante as mudanças de turno', '36. Important information about care gets lost during shift changes.') +
+analise_grafica2('38. Os problemas com frequência ocorrem na troca de informações entre as unidades do hospital', '38. Problems often occur in the exchange of information across hospital units.')) /
+  (analise_grafica2('42. As mudanças de turno são problemáticas para os pacientes deste Hospital', '42. Shift changes are problematic for patients in this Hospital.') + ggplot() + ggplot())
+ggsave("Transferências internas e passagens de plantão2.png", height=18, width=30, units="cm", dpi= 600)
+
+# Aprendizado organizacional - melhoria contínua
+analise_grafica2('6. Estamos ativamente buscando melhorias para a segurança do paciente', '6. We are actively working to improve patient safety.') +
+analise_grafica2('9. Erros que ocorreram levaram a mudanças positivas nesta unidade', '9. Mistakes have led to positive changes in this unit.') +
+analise_grafica2('13. Quando fazemos mudanças para melhorar a segurança do paciente, nós avaliamos sua efetividade', '13. When we make changes to improve patient safety, we evaluate their effectiveness.')
+ggsave("Aprendizado organizacional - melhoria contínua2.png", height=9, width=30, units="cm", dpi= 600)
+
+#Expectativas de promoção da segurança dos supervisores e gerentes
+(analise_grafica2('19. Meu supervisor/gerente elogia quando vê um trabalho feito de acordo com os procedimentos estabelecidos para a segurança do paciente.', '19. My supervisor/manager praises when seeing a job done according to the established procedures for patient safety.') + analise_grafica2('20. Meu supervisor/gerente considera seriamente as sugestões dos funcionários para melhorar a segurança do paciente', '20. My supervisor/manager seriously considers employee suggestions to improve patient safety.') + analise_grafica2('21. Sempre que a pressão aumenta, meu supervisor/gerente quer que trabalhemos mais rápido, mesmo que isto signifique tomar atalhos', '21. Whenever pressure increases, my supervisor/manager wants us to work faster, even if it means taking shortcuts.')) /
+  (analise_grafica2('22. Meu supervisor/gerente ignora problemas recorrentes na segurança do paciente', '22. My supervisor/manager ignores recurring patient safety issues.') + ggplot() + ggplot())
+ggsave("Expectativas de promoção da segurança dos supervisores e gerentes2.png", height=18, width=30, units="cm", dpi= 600)
+
+#Percepção gerais sobre segurança
+(analise_grafica2('10. É apenas por acaso que erros mais sérios não acontecem por aqui', '10. It is just by chance that more serious errors do not happen here.') + analise_grafica2('15. A segurança do paciente nunca é sacrificada em prol de se trabalhar mais', '15. Patient safety is never sacrificed for the sake of working more.') + analise_grafica2('17. Temos problemas com a segurança do paciente nesta unidade', '17. We have problems with patient safety in this unit.')) / 
+  (analise_grafica2('18. Nossos procedimentos e sistemas são bons para impedir que os erros aconteçam', '18. Our procedures and systems are good at preventing errors from happening.') + ggplot() + ggplot())
+ggsave("Percepção gerais sobre segurança2.png", height=18, width=30, units="cm", dpi= 600)
+
+#Respostas não punitivas aos erros
+analise_grafica2('8. Os funcionários sentem que seus erros são usados contra eles', '8. Staff feel that their mistakes are held against them.') +
+analise_grafica2('12. Quando um evento é notificado, sentimos que o foco se concentra no indivíduo, e não no problema', '12. When an event is reported, it feels as if the focus is on the person, not the issue.') +
+analise_grafica2('16. Os funcionários se preocupam que seus erros sejam registrados em seu arquivo funcional', '16. Staff worry that their mistakes are kept in their personnel file.')
+ggsave("Respostas não punitivas aos erros2.png", height=9, width=30, units="cm", dpi= 600)
+
+#Staffing
+(analise_grafica2('2. Temos pessoas suficientes para lidar com o volume de trabalho', '2. We have enough staff to handle the workload.') +
+analise_grafica2('5. Os funcionários desta unidade trabalham mais horas do que o recomendado no atendimento a pacientes', '5. Staff in this unit work longer hours than is best for patient care.') +
+analise_grafica2('7. Utilizamos mais funcionários temporários do que o recomendado no atendimento a paciente', '7. We use more temporary staff than is best for patient care.')) /
+  (analise_grafica2('14. Trabalhamos “em modo de crise”, tentando fazer coisas demais, rápido demais', '14. We work in "crisis mode", trying to do too much, too quickly.') + ggplot() + ggplot())
+ggsave("Staffing2.png", height=18, width=30, units="cm", dpi= 600)
+```
+
+```{r TABELAS COM EQUAÇÕES}
+
+rround2 = function(valor, digitos, ativador){
+  valor2 = formatC(abs(valor), format = "f", digits = digitos)
+  valor2 = as.character(valor2)
+  if (valor < 0){
+    paste0("- ", valor2)
+  }
+  else{
+    if (ativador == "T"){
+      paste0(" + ", valor2)
+    }
+    else{valor2}
+  }
+}
+
+
+fd <- data.frame(Variable = character(0),
+                 "Geral" = character(0), "P_Valor_G" = character(0),
+                 "NAH" = character(0), "P_Valor_0" = character(0),
+                 "AH" = character(0), "P_Valor_1" = character(0))
+
+for (coluna in lista){
+  if (class(df[[coluna]]) == "numeric"){
+    print(coluna)
+    #GERAL ===================================================
+    print("1")
+    #modelo = lm(df[[coluna]]~Ano, data=df)
+    modelo = lmer(df[[coluna]] ~ Ano + (1 | Unidade), data = df)
+    
+    pvalor1 = summary(modelo)$coefficients[2, "Pr(>|t|)"]
+    pvalor1 = retorne_p(pvalor1)
+    
+    coeficientes = coef(modelo)
+    #equacao1 = paste0("y = ", rround2(coeficientes[1],2,"F"), rround2(coeficientes[2],2,"T"), "X")
+    equacao1 = paste0("y = ", rround2(modelo@beta[1],2,"F"), rround2(modelo@beta[2],2,"T"), "X")
+  
+    #NÃO ACREDITADO ===================================================
+    print("2")
+    df_filter = df %>% filter(acreditacao == "NAH")
+    #modelo = lm(df_filter[[coluna]]~Ano, data=df_filter)
+    modelo = lmer(df_filter[[coluna]] ~ Ano + (1 | Unidade), data = df_filter)
+    
+    pvalor2 = summary(modelo)$coefficients[2, "Pr(>|t|)"]
+    pvalor2 = retorne_p(pvalor2)
+    
+    coeficientes_0 = coef(modelo)
+    #equacao2 = paste0("y = ", rround2(coeficientes_0[1],2,"F"), rround2(coeficientes_0[2],2,"T"), "X")
+    equacao2 = paste0("y = ", rround2(modelo@beta[1],2,"F"), rround2(modelo@beta[2],2,"T"), "X")
+    
+    #ACREDITADO ===================================================
+    print("3")
+    df_filter = df %>% filter(acreditacao == "AH")
+    #modelo = lm(df_filter[[coluna]]~Ano, data=df_filter)
+    modelo = lmer(df_filter[[coluna]] ~ Ano + (1 | Unidade), data = df_filter)
+    
+    pvalor3 = summary(modelo)$coefficients[2, "Pr(>|t|)"]
+    pvalor3 = retorne_p(pvalor3)
+    
+    coeficientes_1 = coef(modelo)
+    #equacao3 = paste0("y = ", rround2(coeficientes_1[1],2,"F"), rround2(coeficientes_1[2],2,"T"), "X")
+    equacao3 = paste0("y = ", rround2(modelo@beta[1],2,"F"), rround2(modelo@beta[2],2,"T"), "X")
+    
+    fd[nrow(fd)+1, ] = c(coluna, 
+                         equacao1, pvalor1,
+                         equacao2, pvalor2,
+                         equacao3, pvalor3)
+  }
+}
+
+
+fd %>% capture()
+
+
+```
+
+
+```{r}
+df$Unidade = as.factor(df$Unidade)
+lista = c("NAH", "AH")
+
+df_filter = df
+nrow(df_filter)
+
+for (nivel in lista){
+  for (i in levels(df_filter$Unidade)){
+    quantidade = df_filter %>% filter(Unidade == i & acreditacao == nivel)
+    quantidade = nrow(quantidade)
+    
+    if (quantidade < 3){
+      df_filter = subset(df_filter, !(Unidade == i & acreditacao == nivel))
+      print(nrow(df_filter))
+      }
+  }
+}
+nrow(df_filter)
+```
+
+```{r}
+df_filter = df_filter %>% filter(acreditacao == "AH")
+summary(lmer(df_filter[[coluna]] ~ Ano + (1 | Unidade), data = df_filter))
+
+############################################################
+coluna = 'Transferências internas e passagens de plantão'
+
+ggplot() +
+  geom_point(data=df_filter, aes(x=Ano, y=df_filter[[coluna]], color=as.factor(Ano)), 
+              alpha=0.5, size=2.5, position=position_jitter(0.25)) + 
+  geom_smooth(data=df_filter, aes(x=Ano, y=df_filter[[coluna]]), 
+              method = lm, color = "black") + 
+  facet_wrap(~Unidade) +
+  theme(legend.position="none") + labs(y=coluna)
+
+ggsave("TESTE.png", height=22, width=30, units="cm", dpi=600)
+```
+
+```{r}
+############################################################
+
+analise_grafica2 = function(coluna, titulo){
+  df_filter1 = df_filter %>% filter(acreditacao == 'AH')
+  df_filter2 = df_filter %>% filter(acreditacao == 'NAH')
+  
+  p1 = retorne_p_ajust(retorne_p(summary(lmer(df_filter1[[coluna]] ~ Ano + (1 | Unidade), data = df_filter1))$coefficients[2, "Pr(>|t|)"]))
+  p1 = paste0('AH (', p1, ')')
+  
+  p2 = retorne_p_ajust(retorne_p(summary(lmer(df_filter2[[coluna]] ~ Ano + (1 | Unidade), data = df_filter2))$coefficients[2, "Pr(>|t|)"]))
+  p2 = paste0('NAH (', p2, ')')
+  
+  subtitulo = paste0(p1, ";  ", p2)
+
+  ggplot() +
+    geom_jitter(data=df_filter, aes(x=Ano, y=df_filter[[coluna]], color=as.factor(Ano)), 
+                alpha=0.5, size=2.5, position=position_jitter(0.25)) + 
+    geom_boxplot(data=df_filter, aes(x=Ano, y=df_filter[[coluna]], color=as.factor(Ano)), 
+                 alpha=0.5, fill = 'white') + 
+    geom_smooth(data=df_filter, aes(x=Ano, y=df_filter[[coluna]]), method = lm, color = "black") + 
+    facet_grid(acreditacao~.) + 
+    scale_x_continuous(breaks=seq(from=min(df_filter$Ano), to=max(df_filter$Ano), by=1)) +
+    scale_y_continuous(breaks=seq(from=as.integer(min(df_filter[[coluna]])), 
+                                  to=as.integer(max(df_filter[[coluna]])), 
+                                  by=as.integer((max(df_filter[[coluna]]) - min(df_filter[[coluna]]))/6))) +
+    theme(axis.title=element_text(size=9), 
+          legend.position = "none", axis.line = element_line(colour = "black")) +
+    theme_bw() + theme(legend.position="none") + 
+    labs(subtitle=subtitulo, title=adicionar_quebra_de_linha(titulo, 38), y='Score (%)', x='Year')
+} 
+
+#GERAL
+(analise_grafica2('Abertura de comunicação', 'Open communication') + analise_grafica2('Feedback e comunicação sobre erros', 'Feedback and communication about errors') + analise_grafica2('Frequência de eventos relatados', 'Frequency of reported events')) /
+  (analise_grafica2('Apoio de gestão hospitalar para segurança do paciente', 'Hospital management support for patient safety') + analise_grafica2('Trabalho em equipe entre as unidades hospitalares', 'Teamwork between hospital units') + analise_grafica2('Trabalho em equipe no âmbito das unidades', 'Teamwork within units')) /
+  (analise_grafica2('Transferências internas e passagens de plantão', 'Internal transfers and shift changes') + analise_grafica2('Aprendizado organizacional - melhoria contínua', 'Organizational learning - continuous improvement') + analise_grafica2('Expectativas de promoção da segurança dos supervisores e gerentes', 'Expectations for promoting safety by supervisors and managers')) /
+  (analise_grafica2('Percepção gerais sobre segurança', 'General perceptions about safety') + analise_grafica2('Respostas não punitivas aos erros', 'Non-punitive responses to errors') + analise_grafica2('Staffing', 'Staffing'))
+ggsave("Agrupamentos2.png", height=44, width=30, units="cm", dpi=600)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

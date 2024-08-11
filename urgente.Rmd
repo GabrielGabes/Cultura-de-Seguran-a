@@ -1,0 +1,924 @@
+---
+title: "primeiro_teste"
+author: "Gabriel Silva Dos Anjos"
+date: "2024-08-05"
+output: html_document
+---
+
+```{r}
+source("~/Codigos úteis/R program/executar_sempre.R", echo=F)
+```
+
+
+```{r Carregando dados}
+pasta = 'C:/Users/gabri/OneDrive/Documentos/Anestesia - CMA/Cultura de Segurança/2 - Tabelas com Escores Anuais/'
+arquivo = '0 - Dados_Limpos.xlsx'
+caminho =  file.path(pasta, arquivo)
+banco = read_excel(caminho)
+banco %>% dim()
+
+df = banco %>% filter(Ano >= 2015)
+df = df %>% filter(complete.cases(df[, c(4:34, 36:46)]))
+df %>% dim()
+
+df_backup = df
+rm(df)
+```
+
+
+```{r Quantidade de respostas e hospitais}
+df_backup %>% nrow()
+
+unidade_permanecer = df_backup %>% filter(Ano == 2017)
+unidade_permanecer = unidade_permanecer$Unidade %>% unique()
+
+df_backup = df_backup %>% filter(Unidade %in% unidade_permanecer)
+
+df_backup %>% 
+  group_by(Ano) %>% 
+  summarise(n = n(),
+            qtd_hosp = n_distinct(Unidade)) %>% capture()
+
+df_backup %>% nrow()
+
+```
+# Analise 2015 vs 2022
+
+```{r }
+df_filter = df_backup %>% filter(Ano == 2015 | Ano == 2022)
+df_filter %>% dim()
+
+```
+
+```{r}
+df_backup$Cargo %>% unique()
+```
+
+
+
+
+
+```{r Analise demografica}
+df_filter$controle = sample(c(0,1), nrow(df_filter), prob = c(0.5, 0.5), replace=T)
+
+coluna_analisada = 'Ano'
+
+colunas = c('Cargo',
+            '6. Há quanto tempo você trabalha em sua profissão ou especialização atual?',
+            'SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?',
+            '5. Em sua função, você tipicamente tem contato ou interação direta com os pacientes?')
+print(colunas)
+
+tabelona = conti(df_filter, "controle", coluna_analisada)[FALSE, ]
+
+for (coluna in colunas){
+  classe = class(df_filter[[coluna]])[1]
+  if (classe == "numeric"){
+    tabelinha = summary_numerico_por_grupo_n_parametrico(df_filter, coluna, coluna_analisada)
+  }
+  else if (classe == 'character' | classe == 'factor'){
+    tabelinha = conti(df_filter, coluna_analisada, coluna, "col")
+  }
+  tabelona = rbind(tabelona, tabelinha)
+}
+colnames(tabelona)[colnames(tabelona) == "Overall"] = paste0("Overall (n=", nrow(df_filter[complete.cases(df_filter[[coluna_analisada]]), ]), ")")
+niveis = levels(as.factor(df_filter[[coluna_analisada]]))
+for (i in 1:length(niveis)){
+  nivel = niveis[i]
+  colnames(tabelona)[colnames(tabelona) == nivel] = paste0(nivel, " (n=", table(df_filter[[coluna_analisada]])[i], ")")}
+tabelona %>% capture()
+```
+
+
+Analise scores 2015 a 2022
+
+```{r Criando scores}
+df_score = df_backup %>% group_by(Ano, Unidade, Regional, Estado) %>% summarise()
+df_score$Ano = df_score$Ano %>% as.factor()
+df_score$Regional = as.factor(df_score$Regional)
+df_score$Estado = as.factor(df_score$Estado)
+df_score$prop = NULL
+df_score = as.data.frame(df_score)
+#df_score
+
+#################################################
+
+for (coluna in names(df_backup)[c(4:34, 36:46)] ){
+  #print(coluna)
+  
+  tabela = df_backup %>% group_by(Ano, Unidade) %>% 
+    summarise(prop = (sum(!!sym(coluna) == 1, na.rm=T) / n())*100)
+  tabela$Ano = tabela$Ano %>% as.factor()
+  tabela = as.data.frame(tabela)
+  names(tabela)[names(tabela) == "prop"] <- coluna
+  
+  df_score = merge(df_score, tabela, by = c('Ano','Unidade'))
+}
+
+lista = c('24. Os funcionários falam voluntariamente se vêem algo que possa afetar negativamente o atendimento aos pacientes',
+         '26. Os funcionários sentem-se à vontade para questionar decisões ou ações dos que têm mais autoridade',
+         '28. Os funcionários têm receio de perguntar quando algo não parece certo')
+df_score[['Abertura de comunicação']] = rowMeans(df_score[lista], na.rm = TRUE)
+
+lista = c('23. Recebemos feedback das mudanças implementadas com base nos eventos notificados',
+         '25. Somos informados sobre os erros que acontecem nesta unidade',
+         '27. Nesta unidade, discutimos maneiras de impedir que os erros tornem a acontecer')
+df_score[['Feedback e comunicação sobre erros']] = rowMeans(df_score[lista], na.rm = TRUE)
+
+lista = c('29. Quando acontece um erro, mas ele é identificado e corrigido antes de afetar o paciente, com que frequência é notificado?',
+         '30. Quando acontece um erro, mas que não tem potencial de dano ao paciente, com que frequência é notificado?',
+         '31. Quando acontece um erro que poderia prejudicar o paciente, mas isto não ocorreu, com que frequência é notificado?')
+df_score[['Frequência de eventos relatados']] = rowMeans(df_score[lista], na.rm = TRUE)
+
+lista = c('32. A administração do hospital cria um ambiente de trabalho que promove a segurança do paciente',
+         '39. As ações da administração do hospital mostram que a segurança do paciente é uma prioridade máxima',
+         '40. A administração do hospital parece se interessar pela segurança do paciente apenas quando acontece um evento adverso')
+df_score[['Apoio de gestão hospitalar para segurança do paciente']] = rowMeans(df_score[lista], na.rm = TRUE)
+
+lista = c('33. As unidades hospitalares não se coordenam bem entre si.',
+         '35. Existe uma boa cooperação entre as unidades hospitalares que precisam trabalhar juntas',
+         '37. Muitas vezes é desagradável trabalhar unidades com funcionários de outras unidades do hospital',
+         '41. As unidades do hospital trabalham bem juntas para prestar o melhor atendimento aos pacientes')
+df_score[['Trabalho em equipe entre as unidades hospitalares']] = rowMeans(df_score[lista], na.rm = TRUE)
+
+lista = c('1. As pessoas se apoiam umas às outras nesta unidade',
+         '3. Quando há muito trabalho a ser feito e rapidamente, trabalhamos juntos em equipe para realizar a tarefa',
+         '4. Nesta unidade, as pessoas se tratam com respeito',
+         '11. Quando uma área nesta unidade fica muito movimentada, as demais ajudam')
+df_score[['Trabalho em equipe no âmbito das unidades']] = rowMeans(df_score[lista], na.rm = TRUE)
+
+lista = c('34. Coisas "escapam por entre os dedos” quando os pacientes são transferidos de uma unidade para outra',
+         '36. Importantes informações sobre a assistência se perdem durante as mudanças de turno',
+         '38. Os problemas com frequência ocorrem na troca de informações entre as unidades do hospital',
+         '42. As mudanças de turno são problemáticas para os pacientes deste Hospital')
+df_score[['Transferências internas e passagens de plantão']] = rowMeans(df_score[lista], na.rm = TRUE)
+
+lista = c('6. Estamos ativamente buscando melhorias para a segurança do paciente',
+         '9. Erros que ocorreram levaram a mudanças positivas nesta unidade',
+         '13. Quando fazemos mudanças para melhorar a segurança do paciente, nós avaliamos sua efetividade')
+df_score[['Aprendizado organizacional - melhoria contínua']] = rowMeans(df_score[lista], na.rm = TRUE)
+
+lista = c('19. Meu supervisor/gerente elogia quando vê um trabalho feito de acordo com os procedimentos estabelecidos para a segurança do paciente.',
+         '20. Meu supervisor/gerente considera seriamente as sugestões dos funcionários para melhorar a segurança do paciente',
+         '21. Sempre que a pressão aumenta, meu supervisor/gerente quer que trabalhemos mais rápido, mesmo que isto signifique tomar atalhos',
+         '22. Meu supervisor/gerente ignora problemas recorrentes na segurança do paciente')
+df_score[['Expectativas de promoção da segurança dos supervisores e gerentes']] = rowMeans(df_score[lista], na.rm = TRUE)
+
+lista = c('10. É apenas por acaso que erros mais sérios não acontecem por aqui',
+         '15. A segurança do paciente nunca é sacrificada em prol de se trabalhar mais',
+         '17. Temos problemas com a segurança do paciente nesta unidade',
+         '18. Nossos procedimentos e sistemas são bons para impedir que os erros aconteçam')
+df_score[['Percepção gerais sobre segurança']] = rowMeans(df_score[lista], na.rm = TRUE)
+
+lista = c('8. Os funcionários sentem que seus erros são usados contra eles',
+         '12. Quando um evento é notificado, sentimos que o foco se concentra no indivíduo, e não no problema',
+         '16. Os funcionários se preocupam que seus erros sejam registrados em seu arquivo funcional')
+df_score[['Respostas não punitivas aos erros']] = rowMeans(df_score[lista], na.rm = TRUE)
+
+lista = c('2. Temos pessoas suficientes para lidar com o volume de trabalho',
+         '5. Os funcionários desta unidade trabalham mais horas do que o recomendado no atendimento a pacientes',
+         '7. Utilizamos mais funcionários temporários do que o recomendado no atendimento a paciente',
+         '14. Trabalhamos “em modo de crise”, tentando fazer coisas demais, rápido demais')
+df_score[['score_esc']] = rowMeans(df_score[lista], na.rm = TRUE)
+
+df_score
+
+```
+
+
+```{r Tabela analise 2015 vs 2022}
+tabelona = df_score %>% filter(Ano == 2015 | Ano == 2022)
+tabelona$Ano = tabelona$Ano %>% droplevels()
+tabelona$Ano %>% levels()
+tabelona$Ano = factor(tabelona$Ano, levels = c('2022','2015'))
+tabelona$Ano %>% levels()
+
+lista_pilares = c('Abertura de comunicação',
+  'Feedback e comunicação sobre erros',
+  'Frequência de eventos relatados',
+  'Apoio de gestão hospitalar para segurança do paciente',
+  'Trabalho em equipe entre as unidades hospitalares',
+  'Trabalho em equipe no âmbito das unidades',
+  'Transferências internas e passagens de plantão',
+  'Aprendizado organizacional - melhoria contínua',
+  'Expectativas de promoção da segurança dos supervisores e gerentes',
+  'Percepção gerais sobre segurança',
+  'Respostas não punitivas aos erros',
+  'score_esc')
+
+df_backup$controle = sample(c(0,1), nrow(df_backup), prob = c(0.5, 0.5), replace=T)
+tabelona_score = conti(df_backup, "controle", 'Regional')[FALSE, ]
+
+for (coluna in lista_pilares ){
+  tabelinha_score = summary_numerico_por_grupo_parametrico(tabelona, coluna, 'Ano', teste_extra = 'T')
+  #tabelinha$Variable = coluna
+  tabelona_score = rbind(tabelona_score, tabelinha_score)
+}
+
+tabelona_score %>% capture()
+
+```
+
+# aplicando modelo misto
+
+```{r}
+# Modelo 1
+modelo_lm <- lm(score_esc ~ as.numeric(Ano) + Unidade, data = df_score)
+metricas_de_avaliacao_regressao(df_score, modelo_lm, 'score_esc')
+summary(modelo_lm)
+
+ggplot() +
+  geom_point(data=df_score, aes(x = Ano, y = score_esc, color = Unidade),
+             alpha=0.5, size=2.5) + 
+  geom_smooth(data=df_score, aes(x = as.numeric(Ano), y = pred, color = Unidade),
+              method = "lm", se=TRUE, size = 0.75) +
+  facet_wrap(Unidade~., ncol = 5) + theme(legend.position = 'none') +
+  labs(title = "Modelo com Interceptos e Inclinações Aleatórios", x='x', y='y', color='groups')
+
+# Grafico 2
+ggplot() +
+  # geom_point(data=df_score, aes(x = Ano, y = score_esc, color = Unidade),
+  #            alpha=0.5, size=2.5) + 
+  geom_smooth(data=df_score, aes(x = as.numeric(Ano), y = score_esc, color = Unidade),
+              method = "lm", se=F, size = 0.75) +
+  theme(legend.position = 'none') +
+  labs(title = "Modelo com Interceptos e Inclinações Aleatórios", x='x', y='y', color='groups')
+
+
+#####
+
+```
+
+```{r Criando Modelos}
+library(lmerTest)
+
+df_score$score_esc = df_score$`2. Temos pessoas suficientes para lidar com o volume de trabalho`
+
+#### Modelos Linear ####
+modelo_lm <- lm(score_esc ~ as.numeric(Ano) + Unidade, data = df_score)
+modelo_lm %>% lm_diagnostic()
+
+modelo_lm2 <- lm(score_esc ~ as.numeric(Ano) + Unidade + Regional + Estado, data = df_score)
+modelo_lm2 %>% lm_diagnostic()
+
+anova(modelo_lm, modelo_lm2)
+
+#### Modelo misto ####
+modelo_m1 <- lmerTest::lmer(score_esc ~ as.numeric(Ano) + (1|Unidade), data = df_score)
+modelo_m1 %>% lm_diagnostic()
+
+# MM com inclinção aleatorica MODELO ESCOLHIDO
+modelo_m2 <- lmerTest::lmer(score_esc ~ as.numeric(Ano) + (1 + as.numeric(Ano)|Unidade), data = df_score)
+modelo_m2 %>% lm_diagnostic()
+
+anova(modelo_m1, modelo_m2)
+
+#### Modelo misto (aninhados) - 2 ####
+modelo_an1 <- lmer(score_esc ~ as.numeric(Ano) + (1|Regional/Estado/Unidade), data = df_score)
+modelo_an1 %>% lm_diagnostic()
+
+#### Modelo misto (aninhados + intecepto e inclinação aleatoria) - 3 ####
+modelo_an2 <- lmer(score_esc ~ as.numeric(Ano) + (1 + as.numeric(Ano)|Regional/Estado/Unidade), data = df_score)
+modelo_an2 %>% lm_diagnostic()
+
+anova(modelo_an1, modelo_an2)
+anova(modelo_an2, modelo_m2)
+
+# df_score$inter_ <- factor(interaction(df_score$Regional, df_score$Estado, df_score$Unidade))
+# ggplot(df_score, aes(x = as.numeric(Ano), y = score_esc, color = inter_)) +
+#   geom_point(alpha=0.5, size=2.5) +
+#   geom_smooth(aes(y = pred), method = "lm", se=TRUE, size = 0.75) +
+#   labs(title = "Modelo misto alinhado 2", x='Years', y='y', color='groups') +
+#   theme(legend.position = 'none')
+
+```
+
+```{r Analise dos residuos}
+for (model in list(modelo_m1, modelo_m2, modelo_an1, modelo_an2)){
+  lm_diagnostic(model)
+}
+
+plotar_boxplot_residuos(list(modelo_m1, modelo_m2, modelo_an1, modelo_an2)) + 
+  labs(y = 'Residuos dos Modelos')
+```
+
+
+```{r Outras metricas de avaliação}
+for (model in list(modelo_m1, modelo_m2, modelo_an1, modelo_an2)){
+  metricas_de_avaliacao_regressao(model) %>% round(2) %>% print()
+}
+```
+
+```{r}
+# Gerar a tabela formatada com personalizações
+sjPlot::tab_model(modelo_m1, modelo_m2, show.re.var = TRUE, show.icc = TRUE, digits = 3, title = "Resultados do Modelo Misto")
+```
+
+
+
+```{r MODELOS ESCOLHIDOS}
+
+####### MODELO1 #######
+modelo <- lmerTest::lmer(score_esc ~ as.numeric(Ano) + (1 + as.numeric(Ano)|Unidade), data = df_score)
+metricas_de_avaliacao_regressao(modelo) %>% round(2)
+summary(modelo)
+r.squaredGLMM(modelo)
+
+df_score$pred <- predict(modelo)
+
+ggplot() +
+  #geom_point(data=df_score, aes(x = Ano, y = score_esc, color = Unidade), alpha=0.5, size=2.5) + 
+  geom_smooth(data=df_score, aes(x = as.numeric(Ano), y = pred, color = Unidade),
+              method = "lm", se=TRUE, size = 0.75) +
+  theme(legend.position = 'none') + #facet_wrap(Unidade~., ncol = 5) + 
+  labs(title = "Modelo com Interceptos e Inclinações Aleatórios", x='x', y='y', color='groups')
+ggsave("Modelo com Interceptos e Inclinações Aleatórios.jpg", height=50, width=30, units="cm", dpi= 600)
+
+####### MODELO2 #######
+modelo <- lmerTest::lmer(score_esc ~ as.numeric(Ano) + (1|Unidade), data = df_score)
+metricas_de_avaliacao_regressao(modelo) %>% round(2)
+summary(modelo)
+r.squaredGLMM(modelo)
+
+df_score$pred <- predict(modelo)
+
+ggplot() +
+  #geom_point(data=df_score, aes(x = Ano, y = score_esc, color = Unidade), alpha=0.5, size=2.5) + 
+  geom_smooth(data=df_score, aes(x = as.numeric(Ano), y = pred, color = Unidade),
+              method = "lm", se=TRUE, size = 0.75) +
+  theme(legend.position = 'none') + #facet_wrap(Unidade~., ncol = 5) + 
+  labs(title = "Modelo com Interceptos Aleatórios", x='x', y='y', color='groups')
+ggsave("Modelo com Interceptos Aleatórios.jpg", height=50, width=30, units="cm", dpi= 600)
+
+####### ####### ####### #######
+
+anova(modelo_m1, modelo_m2)
+```
+```{r}
+plotar_boxplot_residuos(list(modelo_m1, modelo_m2)) + 
+  labs(y = 'Residuos dos Modelos') + scale_x_discrete(labels = c('Modelo com\nInterceptos Aleatórios','Modelo com\nInterceptos e Inclinações Aleatórios'))
+```
+
+```{r}
+lista_pilares_nomes = c('Communication openness',
+'Feedback and communication about errors',
+'Frequency of events reported',
+'Management support for patient safety',
+'Teamwork across units',
+'Teamwork within units',
+'Handoffs and transitions',
+'Organizational learning',
+'Supervisor/manager expectations and actions promoting safety',
+'Overall perception of patient safety',
+'Nonpunitive response to errors',
+'score_esc')
+
+# Linear Mixed Model
+library(lmerTest)
+library(MuMIn)
+
+for (i in 1:length(lista_pilares)){
+  coluna = lista_pilares[i]
+  
+  print(paste0('------------------------',coluna,'--------------------------'))
+  
+  modelo = lmerTest::lmer(df_score[[coluna]] ~ as.numeric(Ano) + (1 | Unidade), data = df_score)
+  modelo %>% summary() %>% print()
+  
+  print(paste0('========================'))
+  
+  modelo = lmerTest::lmer(df_score[[coluna]] ~ as.numeric(Ano) + (1 + as.numeric(Ano)|Unidade), data = df_score)
+  modelo %>% summary() %>% print()
+}
+```
+
+
+```{r Graficos}
+
+lista_pilares_nomes = c('Communication openness',
+'Feedback and communication about errors',
+'Frequency of events reported',
+'Management support for patient safety',
+'Teamwork across units',
+'Teamwork within units',
+'Handoffs and transitions',
+'Organizational learning',
+'Supervisor/manager expectations and actions promoting safety',
+'Overall perception of patient safety',
+'Nonpunitive response to errors',
+'score_esc')
+
+# Linear Mixed Model
+library(lmerTest)
+library(MuMIn)
+
+for (i in 1:length(lista_pilares)){
+  coluna = lista_pilares[i]
+  titulo = lista_pilares_nomes[i]
+  
+  p1 = retorne_p_ajust(retorne_p(summary(lmer(df_score[[coluna]] ~ as.numeric(Ano) + (1 | Unidade), data = df_score))$coefficients[2, "Pr(>|t|)"]))
+  
+  p = ggplot() + 
+    geom_jitter(data=df_score, aes(x=as.factor(Ano), y=df_score[[coluna]], fill=as.factor(Ano)), 
+                alpha=0.5, size=2.5, position=position_jitter(0.25), show.legend = F) + 
+    geom_smooth(data=df_score, aes(x=as.numeric(Ano), y=df_score[[coluna]]), method = lm, color = "red") + 
+    #geom_violin(data=df_score, aes(x=as.factor(Ano), y=df_score[[coluna]], fill=as.factor(Ano)), 
+     #           show.legend = F, alpha=0.2) + 
+    #geom_boxplot(data=df_score, aes(x=as.factor(Ano), y=df_score[[coluna]], fill=as.factor(Ano)), 
+     #            alpha=0.90, show.legend = F, width = 0.5, fill = 'white') + 
+    labs(y='Score (%)', title=adicionar_quebra_de_linha(titulo, 50), x='Years', subtitle=p1) + 
+    theme(axis.title=element_text(size=9), 
+          legend.position = "bottom", axis.line = element_line(colour = "black")) +
+    theme_bw() + 
+    scale_y_continuous(breaks=seq(from = 0, 
+                                  to = max(df_score[[coluna]],na.rm = T), 
+                                  by = as.integer((max(df_score[[coluna]],na.rm = T) - min(df_score[[coluna]],na.rm = T))/10)),
+                       limits = c(min(df_score[[coluna]],na.rm = T), max(df_score[[coluna]],na.rm = T))) +
+    theme(axis.title.x = element_text(size = 11),
+          axis.title.y = element_text(size = 11))
+  print(p)
+  
+  #ggsave(paste0(coluna,".png"), height=11, width=20, units="cm", dpi= 600)
+}
+```
+
+
+# Tabela e grafico da proporção de notas
+
+```{r Tabela e grafico da proporção de notas}
+df_filter# = df_filter_backup
+
+coluna = '1. As pessoas se apoiam umas às outras nesta unidade'
+tabelona = df_filter %>% group_by(Ano, Unidade) %>% 
+  summarise(
+    prop = sum(!!sym(coluna) == 1, na.rm=T) / n()
+  )
+tabelona$Ano = tabelona$Ano %>% as.factor()
+tabelona$prop = NULL
+tabelona = as.data.frame(tabelona)
+tabelona
+
+#################################################
+
+for (coluna in names(df_filter)[c(70:74)] ){
+  #print(coluna)
+  
+  tabela = df_filter %>% group_by(Ano, Unidade) %>% 
+    summarise(
+      prop = (sum(!!sym(coluna) == 1, na.rm=T) / n())*100
+    )
+  tabela$Ano = tabela$Ano %>% as.factor()
+  tabela = as.data.frame(tabela)
+  names(tabela)[names(tabela) == "prop"] <- coluna
+  
+  tabelona = merge(tabelona, tabela, by = c('Ano','Unidade'))
+}
+
+tabelona
+
+############################################################################
+# Função para remover caracteres especiais
+remove_special_chars <- function(column_names) {
+  gsub("[^[:alnum:]_]", "_", column_names)
+}
+
+# Aplicar a função aos nomes das colunas
+names(tabelona) <- remove_special_chars(names(tabelona))
+names(tabelona) <- gsub("^([0-9])", "coluna\\1", names(tabelona))
+#names(df) <- gsub("__", "_ ", names(df))
+#names(df) <- gsub(":", " ", names(df))
+names(tabelona)
+############################################################################
+
+
+lista_pilares = names(tabelona)[c(3:7)]
+
+
+lista_pilares_nomes = c('Patient safety rating: Excellent',
+                        'Patient safety rating: Very Good',
+                        'Patient safety rating: Poor', #
+                        'Patient safety rating: Fair', #
+                        'Patient safety rating: Good') #Satisfactory
+
+# Linear Mixed Model
+library(lmerTest)
+library(lmerTest)
+
+for (i in 1:length(lista_pilares)){
+  coluna = lista_pilares[i]
+  titulo = lista_pilares_nomes[i]
+  
+  p1 = retorne_p_ajust(retorne_p(summary(lmer(tabelona[[coluna]] ~ as.numeric(Ano) + (1 | Unidade), data = tabelona))$coefficients[2, "Pr(>|t|)"]))
+  
+  tryCatch({
+  p = ggplot() + 
+    geom_jitter(data=tabelona, aes(x=as.factor(Ano), y=tabelona[[coluna]], fill=as.factor(Ano)), 
+                alpha=0.5, size=2.5, position=position_jitter(0.25), show.legend = F) + 
+    geom_smooth(data=tabelona, aes(x=as.numeric(Ano), y=tabelona[[coluna]]), method = lm, color = "red") + 
+    #geom_violin(data=tabelona, aes(x=as.factor(Ano), y=tabelona[[coluna]], fill=as.factor(Ano)), 
+     #           show.legend = F, alpha=0.2) + 
+    #geom_boxplot(data=tabelona, aes(x=as.factor(Ano), y=tabelona[[coluna]], fill=as.factor(Ano)), 
+     #            alpha=0.90, show.legend = F, width = 0.5, fill = 'white') + 
+    labs(y='Proportion (%)', title=adicionar_quebra_de_linha(titulo, 50), x='Years', subtitle=p1) + 
+    theme(axis.title=element_text(size=9), 
+          legend.position = "bottom", axis.line = element_line(colour = "black")) +
+    theme_bw() + 
+    scale_y_continuous(breaks=seq(from = 0, 
+    to = max(tabelona[[coluna]],na.rm = T), 
+    by = round((max(tabelona[[coluna]],na.rm = T) - min(tabelona[[coluna]],na.rm = T))/10, 2)
+                                  ),
+                       limits = c(min(tabelona[[coluna]],na.rm = T), max(tabelona[[coluna]],na.rm = T))) +
+    theme(axis.title.x = element_text(size = 11),
+          axis.title.y = element_text(size = 11))
+  print(p)
+  ggsave(paste0(coluna,".png"), height=11, width=20, units="cm", dpi= 600)
+  }, error = function(e) {
+    texto = paste0('erro no grafico: ', coluna)
+    
+    return(print(texto))
+  })
+}
+
+
+```
+
+
+# Outros
+
+
+```{r Total de respostas todos os anos}
+
+df_filter_backup %>% nrow()
+
+```
+
+
+```{r}
+
+df_filter = df_filter_backup
+
+df_filter$controle = sample(c(0,1), nrow(df_filter), prob = c(0.5, 0.5), replace=T)
+
+coluna_analisada = 'Ano'
+
+colunas = c('Regional',
+            'Cargo',
+            '6. Há quanto tempo você trabalha em sua profissão ou especialização atual?',
+            'SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?',
+            '5. Em sua função, você tipicamente tem contato ou interação direta com os pacientes?')
+print(colunas)
+
+tabelona = conti(df_filter, "controle", coluna_analisada)[FALSE, ]
+
+for (coluna in colunas){
+  classe = class(df_filter[[coluna]])[1]
+  if (classe == "numeric"){
+    tabelinha = summary_numerico_por_grupo_n_parametrico(df_filter, coluna, coluna_analisada)
+  }
+  else if (classe == 'character' | classe == 'factor'){
+    tabelinha = conti(df_filter, coluna_analisada, coluna, "col")
+  }
+  tabelona = rbind(tabelona, tabelinha)
+}
+colnames(tabelona)[colnames(tabelona) == "Overall"] = paste0("Overall (n=", nrow(df_filter[complete.cases(df_filter[[coluna_analisada]]), ]), ")")
+niveis = levels(as.factor(df_filter[[coluna_analisada]]))
+for (i in 1:length(niveis)){
+  nivel = niveis[i]
+  colnames(tabelona)[colnames(tabelona) == nivel] = paste0(nivel, " (n=", table(df_filter[[coluna_analisada]])[i], ")")}
+tabelona %>% capture()
+
+```
+
+
+```{r}
+
+df_filter_backup$percepcao = NA
+df_filter_backup$coluna_analisada = df_filter_backup$`Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar.`
+
+df_filter_backup$percepcao[df_filter_backup$coluna_analisada %in% c("4. Muito boa","3. Excelente")] = 1
+df_filter_backup$percepcao[!(df_filter_backup$coluna_analisada %in% c("4. Muito boa","3. Excelente"))] = 0
+df_filter_backup$percepcao[is.na(df_filter_backup$coluna_analisada)] = NA
+
+cont(df_filter_backup, 'percepcao')
+df_filter_backup$percepcao %>% is.na() %>% sum()
+df_filter_backup$coluna_analisada %>% is.na() %>% sum()
+
+df_filter_backup$Ano = df_filter_backup$Ano %>% as.factor()
+
+```
+
+
+```{r}
+
+df = df_filter_backup
+
+coluna_analisada = 'percepcao'
+variavel_dependente = coluna_analisada
+
+#colunas = names(df)
+#colunas = colunas[!colunas %in% c(coluna_analisada)]
+colunas = c('Ano',
+            'Regional',
+            'Cargo',
+            '6. Há quanto tempo você trabalha em sua profissão ou especialização atual?',
+            'SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?')
+variaveis_independentes = colunas
+print(colunas)
+
+tabelona = conti(df, "Ano", coluna_analisada)[FALSE, ]
+
+for (coluna in colunas){
+  classe = class(df[[coluna]])[1]
+  if (classe == "numeric"){
+    tabelinha = summary_numerico_por_grupo_n_parametrico(df, coluna, coluna_analisada)
+  }
+  else if (classe == 'character' | classe == 'factor'){
+    tabelinha = conti(df, coluna_analisada, coluna, "col")
+  }
+  tabelona = rbind(tabelona, tabelinha)
+}
+colnames(tabelona)[colnames(tabelona) == "Overall"] = paste0("Overall (n=", nrow(df[complete.cases(df[[coluna_analisada]]), ]), ")")
+niveis = levels(as.factor(df[[coluna_analisada]]))
+for (i in 1:length(niveis)){
+  nivel = niveis[i]
+  colnames(tabelona)[colnames(tabelona) == nivel] = paste0(nivel, " (n=", table(df[[coluna_analisada]])[i], ")")}
+tabelona %>% capture()
+
+####################################################################################
+
+tabelona = analise_mod(glm(df[[coluna_analisada]]~df[['Ano']], family='binomial'))
+
+tabelona$indice = NA
+tabelona = tabelona[, c("indice", setdiff(names(tabelona), "indice"))]
+tabelona = tabelona[FALSE, ]
+
+for (coluna in colunas){
+  tabelinha = analise_mod(glm(df[[coluna_analisada]]~df[[coluna]], family='binomial'))
+  
+  tabelinha$indice = row.names(tabelinha)
+  tabelinha = tabelinha[, c("indice", setdiff(names(tabelinha), "indice"))]
+  
+  row.names(tabelinha) = 1:nrow(tabelinha)
+  
+  if (class(df[[coluna]]) != "numeric"){
+    tabelinha = rbind(NA,NA, tabelinha) #adicionando linha
+    tabelinha[["indice"]] = c(coluna,levels(as.factor(df[[coluna]])))
+  }
+  else{
+    tabelinha[["indice"]] = coluna
+  }
+  tabelona = rbind(tabelona, tabelinha)
+}
+tabelona$`Pr(>|z|)` = sapply(tabelona$`Pr(>|z|)`, function(x) ifelse(is.na(x), NA, retorne_p(x)))
+tabelona$OR = paste0( tabelona$OR, ' (', tabelona$`2.5 %`, ' - ', tabelona$`97.5 %`, ')' )
+tabelona$OR[tabelona$OR == 'NA (NA - NA)'] = NA
+tabelona$`2.5 %` = NULL
+tabelona$`97.5 %` = NULL
+tabelona %>% capture()
+
+
+```
+
+
+```{r}
+############################################################################
+# Função para remover caracteres especiais
+remove_special_chars <- function(column_names) {
+  gsub("[^[:alnum:]_]", "_", column_names)
+}
+
+# Aplicar a função aos nomes das colunas
+names(df) <- remove_special_chars(names(df))
+names(df) <- gsub("^([0-9])", "coluna\\1", names(df))
+
+variaveis_independentes <- remove_special_chars(variaveis_independentes)
+variaveis_independentes <- gsub("^([0-9])", "coluna\\1", variaveis_independentes)
+
+############################################################################
+```
+
+
+```{r Algoritmo de combinações}
+busca_em_grade = function(variavel_dependente, variaveis_independentes){
+  variaveis_independentes = sort(variaveis_independentes)
+  # Gerando todas as combinações de variáveis independentes
+  combinacoes = lapply(1:length(variaveis_independentes), function(x) combn(variaveis_independentes, x, simplify = FALSE))
+  combinacoes = unlist( combinacoes, recursive = FALSE)
+  
+  # Ajustar modelos para cada combinação e armazenar os resultados
+  resultados = data.frame(Combinacao = character(), stringsAsFactors = FALSE)
+  
+  for (comb in combinacoes) {
+    existencia = any(tabelona$Combinacao %in% paste(comb, collapse = "+"))
+    if (existencia == F){
+      resultados = rbind(resultados, data.frame(Combinacao = paste(comb, collapse = "+"), stringsAsFactors = FALSE))
+    }
+  }
+  resultados = resultados %>% distinct(Combinacao, .keep_all = TRUE)
+  return(resultados)
+}
+
+variaveis_independentes = sort(variaveis_independentes)
+tabelona = data.frame(Combinacao = character(), stringsAsFactors = FALSE)
+
+# for (linha in 1:nrow(combinacoes)){
+#   variveis_comb = append(variaveis_independentes, combinacoes[linha,] %>% as.character())
+tabela = busca_em_grade(variavel_dependente, variaveis_independentes)
+tabelona = rbind(tabelona, tabela)
+# }
+
+tabelona = tabelona %>% distinct(Combinacao, .keep_all = TRUE)
+
+########################################################################
+num_linhas = nrow(tabelona)
+novas_colunas = data.frame(
+  tp = rep(NA, num_linhas), tn = rep(NA, num_linhas), fp = rep(NA, num_linhas), fn = rep(NA, num_linhas),
+  Acuracia = rep(NA, num_linhas), Precisao = rep(NA, num_linhas), Especificidade = rep(NA, num_linhas), 
+  AUC_ROC = rep(NA, num_linhas), 
+  Pseudo_R2_McFadden = rep(NA, num_linhas), Pseudo_R2_Nagelkerke = rep(NA, num_linhas), 
+  AIC = rep(NA, num_linhas), BIC = rep(NA, num_linhas), VIF = rep(NA, num_linhas),
+  controle = rep(NA, num_linhas),
+  stringsAsFactors = FALSE
+)
+tabelona = cbind(tabelona, novas_colunas)
+
+########################################################################
+tabelona
+
+```
+
+# Modelos de Classificação
+
+```{r}
+library(car)
+library(caret)
+library(pROC)
+```
+
+ESTA SEMPRE ATENTO NA VARIAVEL DESFECHO
+- sempre deve ser binaria com valores 0 ou 1
+
+```{r}
+
+# Função para ajustar o modelo e calcular as métricas
+calcular_metricas = function(data_df, variavel_dependente, vars_independentes){
+  formula_texto = paste0(variavel_dependente, "~", vars_independentes)
+  formula_do_modelo = as.formula(formula_texto) 
+  vars_independentes_lista = unlist(strsplit(vars_independentes, split = "\\+"))
+  
+  tryCatch({
+    ################################################################################
+    modelo = glm(formula=formula_do_modelo, family = binomial(), data = data_df)
+    #, weights = ps_ipw$weights)
+    
+    # Previsões e dados reais
+    df_clean = data_df[complete.cases(data_df[, c(variavel_dependente, vars_independentes_lista)]), ]
+    previsoes = predict(modelo, newdata = df_clean, type = "response")
+    previsoes_bin = ifelse(previsoes > 0.5, 1, 0)
+    dados_reais = df_clean[[variavel_dependente]]
+    
+    # Calcular métricas
+    matrix = confusionMatrix(as.factor(previsoes_bin), as.factor(dados_reais), positive = "1")
+    acuracia = matrix$overall['Accuracy']
+    sensibilidade = matrix$byClass['Sensitivity']  # Precisão é 'Pos Pred Value'
+    especificidade = matrix$byClass['Specificity']
+    auc = roc(dados_reais, previsoes)$auc
+    
+    pseudo_r2_McFadden = 1 - (modelo$deviance / modelo$null.deviance)
+    pseudo_r2_Nagelkerke = PseudoR2(modelo, which = "Nagelkerke")
+    
+    aic = AIC(modelo)
+    bic = BIC(modelo)
+    
+    if (length(vars_independentes_lista) > 1) {
+      VIF = any(vif(modelo) > 10)
+    } else {
+      VIF = FALSE
+    }
+    
+    # Extração dos valores de TP, TN, FP, FN
+    tp = matrix$table[2, 2]
+    tn = matrix$table[1, 1]
+    fp = matrix$table[1, 2]
+    fn = matrix$table[2, 1]
+    
+    return(c(tp, tn, fp, fn, 
+             acuracia, sensibilidade, especificidade, 
+             auc, 
+             pseudo_r2_McFadden, pseudo_r2_Nagelkerke, 
+             aic, bic, VIF,
+             'ok'))
+    
+    ################################################################################
+  }, error = function(e) {
+    print(paste0('erro com o modelo: ', formula_texto))
+    
+    return(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 'erro'))
+  })
+}
+
+```
+
+
+```{r Aplicando algorimo de grade}
+for (linha in 1:nrow(tabelona)){
+  controle = tabelona$controle[linha]
+  if (controle == 'erro' | is.na(controle)){
+    tabelona[linha,] = c(tabelona$Combinacao[linha], calcular_metricas(df, variavel_dependente, tabelona$Combinacao[linha]) )
+  }
+}
+tabelona
+```
+
+
+```{r}
+tabelona$Acuracia = tabelona$Acuracia %>% as.double() %>% round(2)
+tabelona$Precisao = tabelona$Precisao %>% as.double() %>% round(2)
+tabelona$Especificidade = tabelona$Especificidade %>% as.double() %>% round(2)
+tabelona$AUC_ROC = tabelona$AUC_ROC %>% as.double() %>% round(2)
+tabelona$Pseudo_R2_McFadden = tabelona$Pseudo_R2_McFadden %>% as.double() %>% round(2)
+tabelona$Pseudo_R2_Nagelkerke = tabelona$Pseudo_R2_Nagelkerke %>% as.double() %>% round(2)
+tabelona$AIC = tabelona$AIC %>% as.double() %>% round(2)
+tabelona$BIC = tabelona$BIC %>% as.double() %>% round(2)
+
+```
+
+
+```{r}
+
+formula_do_modelo = as.formula(paste0(variavel_dependente,'~',tabelona$Combinacao[31]))
+
+modelo = glm(formula=formula_do_modelo, family = binomial(), data = df)
+tabela_mod = modelo %>% analise_mod()
+tabela_mod %>% capture()
+```
+
+
+```{r}
+
+
+variaveis_independentes
+#tabelona$Acuracia = tabelona$Acuracia %>% as.double()
+
+teste_normalidade(tabelona %>% filter(str_detect(Combinacao, 'Ano')), 'AUC_ROC', cor_esc = 1) + labs(x='Ano')
+teste_normalidade(tabelona %>% filter(str_detect(Combinacao, 'Cargo')), 'AUC_ROC', cor_esc = 2) + labs(x='Cargo')
+teste_normalidade(tabelona %>% filter(str_detect(Combinacao, 'coluna6__Há_quanto_tempo_você_trabalha_em_sua_profissão_ou_especialização_atual_')), 'AUC_ROC', cor_esc = 3) + labs(x='coluna6__Há_quanto_tempo_você_trabalha_em_sua_profissão_ou_especialização_atual_')
+teste_normalidade(tabelona %>% filter(str_detect(Combinacao, 'Regional')), 'AUC_ROC', cor_esc = 4) + labs(x='Regional')
+teste_normalidade(tabelona %>% filter(str_detect(Combinacao, 'SEÇÃO_H__1__Há_quanto_tempo_você_trabalha_neste_hospital_')), 'AUC_ROC', cor_esc = 4) + labs(x='SEÇÃO_H__1__Há_quanto_tempo_você_trabalha_neste_hospital_')
+
+```
+
+
+```{r}
+tabelona$AUC_ROC = tabelona$AUC_ROC %>% as.double()
+
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+
+df_filter = df_filter_backup %>% filter(Ano == 2015 | Ano == 2022)
+df_filter$controle = sample(c(0,1), nrow(df_filter), prob = c(0.5, 0.5), replace=T)
+
+coluna_analisada = 'Ano'
+
+colunas = c('Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar.','SEÇÃO G: Número de Eventos Notificados  Nos últimos 12 meses, quantas notificações de evento você preencheu e enviou?')
+print(colunas)
+
+tabelona = conti(df_filter, "controle", coluna_analisada)[FALSE, ]
+
+for (coluna in colunas){
+  classe = class(df_filter[[coluna]])[1]
+  if (classe == "numeric"){
+    tabelinha = summary_numerico_por_grupo_n_parametrico(df_filter, coluna, coluna_analisada)
+  }
+  else if (classe == 'character' | classe == 'factor'){
+    tabelinha = conti(df_filter, coluna_analisada, coluna, "col")
+  }
+  tabelona = rbind(tabelona, tabelinha)
+}
+colnames(tabelona)[colnames(tabelona) == "Overall"] = paste0("Overall (n=", nrow(df_filter[complete.cases(df_filter[[coluna_analisada]]), ]), ")")
+niveis = levels(as.factor(df_filter[[coluna_analisada]]))
+for (i in 1:length(niveis)){
+  nivel = niveis[i]
+  colnames(tabelona)[colnames(tabelona) == nivel] = paste0(nivel, " (n=", table(df_filter[[coluna_analisada]])[i], ")")}
+tabelona %>% capture()
+
+```
+

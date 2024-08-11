@@ -1,0 +1,189 @@
+```{r}
+df = df_backup
+```
+
+# Analise Multivariada
+
+```{r Listando}
+acreditacoes = c( #"acreditacao"
+  "Acreditação",
+  "Acreditação2")
+
+horas_trabalhadas = c( #"SEÇÃO H: 3.Tipicamente, quantas horas por semana você trabalha neste hospital?",
+  "SEÇÃO H: 3.2 Trabalha mais que 40horas semanais",
+  "SEÇÃO H: 3.2 Trabalha mais que 60horas semanais",
+  "SEÇÃO H: 3.2 Trabalha mais que 80horas semanais",
+  "SEÇÃO H: Horas trabalhadas semanais")
+
+nota_gerais = c( #"Nota Geral"
+  "Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar.",
+  "Nota_Geral_num",
+  "Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar._Excelente",
+  "Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar._Muito boa",
+  "Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar._Muito ruim",
+  "Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar._Ruim",
+  "Por favor, dê uma nota geral para a segurança do paciente em sua área/unidade de trabalho hospitalar._Satisfatória",
+  "Nota Geral == Satisfatoria ?",
+  "Nota Geral == Boa ?") 
+  
+tempo_trabalhados = c( #"SEÇÃO H: 2.Há quanto tempo você trabalha nesta área/unidade de trabalho hospitalar?",
+  "SEÇÃO H: 1.2 trabalha a mais de 1 ano no hospital?",
+  "SEÇÃO H: 1.3 trabalha a mais de 5 anos no hospital?",
+  "SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?",
+  "SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?_0. Menos de 1 ano",
+  "SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?_1. 1 a 5 anos",
+  "SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?_2. 6 a 10 anos",
+  "SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?_3. 11 a 15 anos",
+  "SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?_4. 16 a 20 anos",
+  "SEÇÃO H: 1. Há quanto tempo você trabalha neste hospital?_5. 21 anos ou mais")
+  
+tempo_trabalhados_na_profissao = c( #"6. Há quanto tempo você trabalha em sua profissão ou especialização atual?",
+  "6. Há quanto tempo você trabalha em sua profissão ou especialização atual?_0. Menos de 1 ano",
+  "6. Há quanto tempo você trabalha em sua profissão ou especialização atual?_1. 1 a 5 anos",
+  "6. Há quanto tempo você trabalha em sua profissão ou especialização atual?_2. 6 a 10 anos",
+  "6. Há quanto tempo você trabalha em sua profissão ou especialização atual?_3. 11 a 15 anos",
+  "6. Há quanto tempo você trabalha em sua profissão ou especialização atual?_4. 16 a 20 anos",
+  "6. Há quanto tempo você trabalha em sua profissão ou especialização atual?_5. 21 anos ou mais")
+
+locais = c('Estado') #Regional
+
+lista = c(acreditacoes,
+  horas_trabalhadas,
+  nota_gerais,
+  tempo_trabalhados,
+  tempo_trabalhados_na_profissao,
+  locais)
+
+#################################################################
+# colunas = names(df)
+# for (item in lista){
+#   colunas = colunas[!(colunas %in% item)]
+# }
+# 
+# coluna_analisada = 'SEÇÃO G2: Notificou algum evento nos ultimos 12 meses'
+# colunas = colunas[!(colunas %in% coluna_analisada)]
+# colunas = colunas[!(colunas %in% "5. Em sua função, você tipicamente tem contato ou interação direta com os pacientes?" )]
+# colunas = colunas[!(colunas %in% 'controle')]
+#################################################################
+for (item in lista){
+  df[[item]] = NULL
+}
+names(df)
+#################################################################
+```
+
+```{r}
+scores_finais = c("Abertura de comunicação",
+  "Feedback e comunicação sobre erros",
+  "Frequência de eventos relatados",
+  "Apoio de gestão hospitalar para segurança do paciente",
+  "Trabalho em equipe entre as unidades hospitalares",
+  "Trabalho em equipe no âmbito das unidades",
+  "Transferências internas e passagens de plantão",
+  "Aprendizado organizacional - melhoria contínua",
+  "Expectativas de promoção da segurança dos supervisores e gerentes",
+  "Percepção gerais sobre segurança",
+  "Respostas não punitivas aos erros",
+  "Staffing")
+
+restantes = c(
+  "SEÇÃO H: 2.Há quanto tempo você trabalha nesta área/unidade de trabalho hospitalar?",
+  "SEÇÃO H: 3.Tipicamente, quantas horas por semana você trabalha neste hospital?",
+  "5. Em sua função, você tipicamente tem contato ou interação direta com os pacientes?",
+  "6. Há quanto tempo você trabalha em sua profissão ou especialização atual?",
+  "Regional",
+  "acreditacao",
+  "Nota Geral",
+  'Setor')
+
+lista = c(scores_finais, restantes, 'controle')
+#################################################################
+colunas = names(df)
+for (item in lista){
+  colunas = colunas[!(colunas %in% item)]
+}
+
+coluna_analisada = 'SEÇÃO G2: Notificou algum evento nos ultimos 12 meses'
+#################################################################
+colunas
+
+```
+
+## TRATANDO O NOME DAS VARIAVEIS
+
+
+```{r}
+# Função para remover caracteres especiais
+remove_special_chars <- function(column_names) {
+  gsub("[^[:alnum:]_]", "_", column_names)
+}
+
+names(df) <- remove_special_chars(names(df))
+names(df) <- gsub("^([0-9])", "coluna\\1", names(df))
+
+scores_finais  <- remove_special_chars(scores_finais)
+scores_finais <- gsub("^([0-9])", "coluna\\1", scores_finais)
+
+restantes  <- remove_special_chars(restantes)
+restantes <- gsub("^([0-9])", "coluna\\1", restantes)
+
+colunas  <- remove_special_chars(colunas)
+colunas <- gsub("^([0-9])", "coluna\\1", colunas)
+
+coluna_analisada  <- remove_special_chars(coluna_analisada)
+coluna_analisada <- gsub("^([0-9])", "coluna\\1", coluna_analisada)
+coluna_analisada
+
+```
+
+
+```{r Primeiro modelo - apenas os scores finais}
+vars = scores_finais
+formula = paste(vars, collapse = "+")
+formula = as.formula(paste(coluna_analisada, "~", formula))
+
+modelo = glm(formula, family = binomial(), data = df)
+modelo_tab = modelo %>% analise_mod()
+modelo_tab %>% capture()
+```
+
+```{r Segundo modelo - apenas as questões}
+vars = colunas
+formula = paste(vars, collapse = "+")
+formula = as.formula(paste(coluna_analisada, "~", formula))
+
+modelo = glm(formula, family = binomial(), data = df)
+modelo_tab = modelo %>% analise_mod()
+modelo_tab %>% capture()
+```
+
+```{r Terceiro modelo - apenas os resto - caracteristicas pessoais}
+vars = restantes
+formula = paste(vars, collapse = "+")
+formula = as.formula(paste(coluna_analisada, "~", formula))
+
+modelo = glm(formula, family = binomial(), data = df)
+modelo_tab = modelo %>% analise_mod()
+modelo_tab %>% capture()
+```
+
+```{r Quarto Modelo - scores + restantes}
+vars = c(scores_finais, restantes)
+formula = paste(vars, collapse = "+")
+formula = as.formula(paste(coluna_analisada, "~", formula))
+
+modelo = glm(formula, family = binomial(), data = df)
+modelo_tab = modelo %>% analise_mod()
+modelo_tab %>% capture()
+```
+
+```{r Quinto Modelo - Questões + restantes}
+vars = c(colunas, restantes)
+formula = paste(vars, collapse = "+")
+formula = as.formula(paste(coluna_analisada, "~", formula))
+
+modelo = glm(formula, family = binomial(), data = df)
+modelo_tab = modelo %>% analise_mod()
+modelo_tab %>% capture()
+```
+

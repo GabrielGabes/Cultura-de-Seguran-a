@@ -1,0 +1,161 @@
+```{r}
+# Linear Mixed Model
+library(lme4)
+library(lmerTest)
+
+df <- read_excel("C:/Users/ADM/Onedrive/Documentos/Cultura/4 - Dados_Score_Ano_vs_Acreditacao_vs_Unidade.xlsx")
+setwd("C:/Users/ADM/Onedrive/Documentos/Cultura/Medidas")
+df_backup = df
+#df
+
+df$acreditacao = ifelse(df$acreditacao == 1, 'AH', 'NAH')
+df$acreditacao = as.factor(df$acreditacao)
+df$acreditacao <- factor(df$acreditacao, levels = c('NAH', 'AH'))
+cont(df, "acreditacao")
+
+pareamento = FALSE
+```
+
+
+```{r FUNÇÃO GRAFICOS BOXPLOT + VIOLINO + JITTER POINTS}
+analise_grafica = function(coluna, titulo){
+  grupo = df[[coluna]]
+  grupo0 = df[[coluna]][df$acreditacao == 'NAH']
+  grupo1 = df[[coluna]][df$acreditacao == 'AH']
+  
+  #Teste de Hipotese - Teste Mann Whitney
+  teste_man = wilcox.test(grupo1,grupo0,conf.int = TRUE, paired = pareamento)
+  man = retorne_p_ajust(retorne_p(teste_man$p.value))
+  
+  #Estimador Hodges Lehmann
+  estimador = as.character(rround(teste_man$estimate,2))
+  IC_00 = as.character(rround(teste_man$conf.int[1],2))
+  IC_01 = as.character(rround(teste_man$conf.int[2],2))
+  hodges_lehmann = paste0(estimador,' [',IC_00,' to ',IC_01,']')
+  
+  texto_dentro_do_grafico = paste0(man)
+  eixo_x = paste0("Median of Differences = ", hodges_lehmann)
+  
+  ggplot() + 
+    geom_jitter(data=df, aes(x=as.factor(acreditacao), y=df[[coluna]], fill=as.factor(acreditacao)), 
+                alpha=0.5, size=2.5, position=position_jitter(0.25), show.legend = F) + 
+    geom_violin(data=df, aes(x=as.factor(acreditacao), y=df[[coluna]], fill=as.factor(acreditacao)), 
+                show.legend = F, alpha=0.2) + 
+    geom_boxplot(data=df, aes(x=as.factor(acreditacao), y=df[[coluna]], fill=as.factor(acreditacao)), 
+                 alpha=0.90, show.legend = F, width = 0.5, fill = 'white') + 
+    annotate("text", x = 1.5, y = max(df[[coluna]],na.rm = T), 
+             label = texto_dentro_do_grafico, vjust = 0.7, size = 4, color = "black") +
+    labs(y='Score (%)', title=adicionar_quebra_de_linha(titulo, 38), x=eixo_x) + 
+    theme(axis.title=element_text(size=9), 
+          legend.position = "bottom", axis.line = element_line(colour = "black")) +
+    theme_bw() + 
+    scale_y_continuous(breaks=seq(from = 0, 
+                                  to = max(df[[coluna]],na.rm = T), 
+                                  by = as.integer((max(df[[coluna]],na.rm = T) - min(df[[coluna]],na.rm = T))/10)),
+                       limits = c(min(df[[coluna]],na.rm = T), max(df[[coluna]],na.rm = T))) +
+    theme(axis.title.x = element_text(size = 11),
+          axis.title.y = element_text(size = 11))
+}
+
+analise_grafica('Abertura de comunicação', 'Open communication')
+```
+
+```{r Tabela com medidas}
+fd <- data.frame(Variable = character(0),
+                 ##"Total u" = character(0), "No u" = character(0), "Yes u" = character(0), 
+                 ##"t Test" = character(0), "d'Cohen" = character(0), 
+                 "Total Md" = character(0), "No Md" = character(0), "Yes Md" = character(0), 
+                 "MW" = character(0), "Hod-Leh" = character(0)
+                 #,"Odds MW" = character(0), "LC" = character(0)
+                 )
+
+for (coluna in lista){
+  if (class(df[[coluna]]) == "numeric"){
+    grupo = df[[coluna]]
+    grupo0 = df[[coluna]][df$acreditacao == "NAH"]
+    grupo1 = df[[coluna]][df$acreditacao == "AH"]
+    
+    #Média
+    ##ut = as.character(rround(mean(grupo, na.rm=T),2))
+    ##u0 = as.character(rround(mean(grupo0, na.rm=T),2))
+    ##u1 = as.character(rround(mean(grupo1, na.rm=T),2))
+    
+    #Desvio Padrão
+    ##sdt = as.character(rround(sd(grupo, na.rm=T),2))
+    ##sd0 = as.character(rround(sd(grupo0, na.rm=T),2))
+    ##sd1 = as.character(rround(sd(grupo1, na.rm=T),2))
+    #concat
+    ##u_sdt = paste0(ut," ± ",sdt)
+    ##u_sd0 = paste0(u0," ± ",sd0)
+    ##u_sd1 = paste0(u1," ± ",sd1)
+    
+    #Tamanho do efeito (parametrico)
+    ##d_cohen <- cohen.d(grupo1,grupo0)
+    ##estimador = as.character(rround(d_cohen$estimate[1],2))
+    ##IC_0 = as.character(rround(d_cohen$conf.int[1],2))
+    ##IC_1 = as.character(rround(d_cohen$conf.int[2],2))
+    ##d_cohen = paste0(estimador," (",IC_0," to ",IC_1,")")
+    
+    #Teste de Hipotese - Teste t
+    ##teste_t = retorne_p(t.test(df[[coluna]]~df$acreditacao, data=df)$p.value)
+
+    #Mediana
+    quartist = quantile(grupo, probs=c(.25, .5, .75))
+    quartist = round(quartist,2)
+    quartis0 = quantile(grupo0, probs=c(.25, .5, .75))
+    quartis0 = round(quartis0,2)
+    quartis1 = quantile(grupo1, probs=c(.25, .5, .75))
+    quartis1 = round(quartis1,2)
+    #concat
+    mdt = paste0(quartist[2],' [',quartist[1],' - ',quartist[3],']')
+    md0 = paste0(quartis0[2],' [',quartis0[1],' - ',quartis0[3],']')
+    md1 = paste0(quartis1[2],' [',quartis1[1],' - ',quartis1[3],']')
+    
+    #Teste de Hipotese - Teste Mann Whitney
+    teste_man = wilcox.test(grupo1,grupo0,conf.int = TRUE, paired = pareamento)
+    man = retorne_p(teste_man$p.value)
+    
+    #Estimador Hodges Lehmann
+    estimador = as.character(rround(teste_man$estimate,2))
+    IC_00 = as.character(rround(teste_man$conf.int[1],2))
+    IC_01 = as.character(rround(teste_man$conf.int[2],2))
+    hodges_lehmann = paste0(estimador,' (',IC_00,' to ',IC_01,')')
+    
+    #ODDS
+    ##group1 = grupo1
+    ##group0 = grupo0
+    ##test_result <- wilcox.test(group1, group0)
+    ##U <- test_result$statistic
+    ##n1 <- length(group1)
+    ##n2 <- length(group0)
+    ##wmw_or <- U / (n1 * n2 - U)
+    ##se_log_wmw_or <- sqrt(1/n1 + 1/n2 + 1/U + 1/(n1*n2 - U))
+    ##lower_limit <- exp(log(wmw_or) - 1.96 * se_log_wmw_or)
+    ##lower_limit = as.character(rround(lower_limit,2))
+    ##upper_limit <- exp(log(wmw_or) + 1.96 * se_log_wmw_or)
+    ##upper_limit = as.character(rround(upper_limit,2))
+    ##wmw_or = as.character(rround(wmw_or,2))
+    ##odds = paste0(wmw_or,' (',lower_limit,' to ',upper_limit,')')
+    
+    #Tamanho do efeito linguagem comum
+    ##n1 = length(grupo0)
+    ##n2 = length(grupo1)
+    ##U1 = teste_man$statistic
+    ##U2 = n1*n2-U1
+    ##LC = 100*max(U1,U2)/sum(U1,U2)
+    ##LC = as.character(rround(LC,2))
+    ##LC = paste0(LC,"%")
+  
+    fd[nrow(fd)+1,] = c(coluna,
+                        ##u_sdt,u_sd0,u_sd1,
+                        ##teste_t,d_cohen,
+                        mdt, md0, md1,
+                        man,hodges_lehmann
+                        ##, odds, LC
+                        )
+  }
+}
+
+capture(fd)
+```
+

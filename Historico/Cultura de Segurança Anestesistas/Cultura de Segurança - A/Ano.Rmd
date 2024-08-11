@@ -1,0 +1,409 @@
+```{r}
+install.packages("RcmdrMisc", repos="https://cran.rediris.org/", dependencies=TRUE)
+library(RcmdrMisc)
+
+options(repos=c(cran="http://cran.rstudio.com"))
+
+
+```
+
+
+```{r}
+setwd("C:/Users/ADM/OneDrive/Documentos/Cultura de Segurança - A")
+df <- read_excel("4 - Dados_Score_Ano_vs_Acreditacao_vs_Unidade.xlsx")
+
+df
+```
+
+```{r}
+df_2014 = df %>% filter(Ano == 2014)
+nrow(df_2014)
+df_2022 = df %>% filter(Ano == 2022)
+nrow(df_2022)
+
+df = rbind(df_2014, df_2022)
+```
+
+```{r}
+analise_grafica = function(coluna, titulo){
+  grupo = df[[coluna]]
+  grupo0 = df[[coluna]][df$Ano == 2014]
+  grupo1 = df[[coluna]][df$Ano == 2022]
+  
+  #Teste de Hipotese - Teste Mann Whitney
+  teste_man = wilcox.test(grupo1,grupo0,conf.int = TRUE)
+  man = retorne_p_ajust(retorne_p(teste_man$p.value))
+  
+  #Estimador Hodges Lehmann
+  estimador = as.character(rround(teste_man$estimate,2))
+  IC_00 = as.character(rround(teste_man$conf.int[1],2))
+  IC_01 = as.character(rround(teste_man$conf.int[2],2))
+  hodges_lehmann = paste0(estimador,' [',IC_00,' to ',IC_01,']')
+  
+  texto_dentro_do_grafico = paste0(man)
+  eixo_x = paste0("Median of Differences = ", hodges_lehmann)#, '\nr = ', r)
+  
+  ggplot() + 
+    geom_violin(data=df, aes(x=as.factor(Ano), y=df[[coluna]], fill=as.factor(Ano)), show.legend = F, alpha=0.2) + 
+    geom_boxplot(data=df, aes(x=as.factor(Ano), y=df[[coluna]], fill=as.factor(Ano)), alpha=0.90, show.legend = F, width = 0.5, fill = 'white') + 
+    geom_errorbar(data=df, aes(x=as.factor(Ano), y=df[[coluna]], fill=as.factor(Ano)), stat = "summary", fun.data = "mean_se", width= 0.14, color="pink") +
+    geom_point(data=df, aes(x=as.factor(Ano), y=df[[coluna]], fill=as.factor(Ano)), stat = "summary", fun = "mean", show.legend = F, color="red", size=2) + 
+    annotate("text", x = 1.5, y = max(df[[coluna]],na.rm = T), label = texto_dentro_do_grafico, vjust = 0.7, size = 4, color = "black") +
+    labs(y='Score (%)', title=adicionar_quebra_de_linha(titulo), x=eixo_x) + 
+    theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic'), 
+          legend.position = "bottom",axis.line = element_line(colour = "black")) +
+    theme_bw() + 
+    scale_y_continuous(breaks=seq(from = 0, 
+                                  to = max(df[[coluna]],na.rm = T), 
+                                  by = as.integer((max(df[[coluna]],na.rm = T) - min(df[[coluna]],na.rm = T))/10)),
+                       limits = c(min(df[[coluna]],na.rm = T), max(df[[coluna]],na.rm = T))) +
+    theme(axis.title.x = element_text(size = 11),
+          axis.title.y = element_text(size = 11))
+}
+
+##############################################################################################
+#GERAL
+(analise_grafica('Abertura de comunicação', 'Open communication') + analise_grafica('Feedback e comunicação sobre erros', 'Feedback and communication about errors') + analise_grafica('Frequência de eventos relatados', 'Frequency of reported events')) /
+  (analise_grafica('Apoio de gestão hospitalar para segurança do paciente', 'Hospital management support for patient safety') + analise_grafica('Trabalho em equipe entre as unidades hospitalares', 'Teamwork between hospital units') + analise_grafica('Trabalho em equipe no âmbito das unidades', 'Teamwork within units')) /
+  (analise_grafica('Transferências internas e passagens de plantão', 'Internal transfers and shift changes') + analise_grafica('Aprendizado organizacional - melhoria contínua', 'Organizational learning - continuous improvement') + analise_grafica('Expectativas de promoção da segurança dos supervisores e gerentes', 'Expectations for promoting safety by supervisors and managers')) /
+  (analise_grafica('Percepção gerais sobre segurança', 'General perceptions about safety') + analise_grafica('Respostas não punitivas aos erros', 'Non-punitive responses to errors') + analise_grafica('Staffing', 'Staffing'))
+ggsave("Agrupamentos2.png", height=44, width=30, units="cm", dpi=600)
+
+# Abertura de comunicação
+analise_grafica('24. Os funcionários falam voluntariamente se vêem algo que possa afetar negativamente o atendimento aos pacientes', '24. Employees voluntarily speak up if they see something that may negatively affect patient care') + 
+analise_grafica('26. Os funcionários sentem-se à vontade para questionar decisões ou ações dos que têm mais autoridade', '26. Staff feel free to question the decisions or actions of those with more authority') + 
+analise_grafica('28. Os funcionários têm receio de perguntar quando algo não parece certo', '28. Staff are afraid to ask when something does not look right')
+ggsave("Abertura de comunicação2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Feedback e comunicação sobre erros
+analise_grafica('23. Recebemos feedback das mudanças implementadas com base nos eventos notificados', '23. We are given feedback about changes put into place based on event reports') +
+analise_grafica('25. Somos informados sobre os erros que acontecem nesta unidade', '25. We are informed about errors that happen in this unit') +
+analise_grafica('27. Nesta unidade, discutimos maneiras de impedir que os erros tornem a acontecer', '27. In this unit, we discuss ways to prevent errors from happening again')
+ggsave("Feedback e comunicação sobre erros2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Frequência de eventos relatados
+analise_grafica('29. Quando acontece um erro, mas ele é identificado e corrigido antes de afetar o paciente, com que frequência é notificado?', '29. When a mistake is made, but is caught and corrected before affecting the patient, how often is this reported?') +
+analise_grafica('30. Quando acontece um erro, mas que não tem potencial de dano ao paciente, com que frequência é notificado?', '30. When a mistake is made, but has no potential to harm the patient, how often is this reported?') +
+analise_grafica('31. Quando acontece um erro que poderia prejudicar o paciente, mas isto não ocorreu, com que frequência é notificado?', '31. When a mistake is made that could harm the patient, but does not, how often is this reported?')
+ggsave("Frequencia de eventos relatados2.png", height=13, width=30, units="cm", dpi= 600)
+
+# Apoio de gestão hospitalar para segurança do paciente
+analise_grafica('32. A administração do hospital cria um ambiente de trabalho que promove a segurança do paciente', '32. Hospital management supports my daily efforts to keep patients safe') +
+analise_grafica('39. As ações da administração do hospital mostram que a segurança do paciente é uma prioridade máxima', '39. Hospital management is doing a good job of keeping patient safety a top priority') +
+analise_grafica('40. A administração do hospital parece se interessar pela segurança do paciente apenas quando acontece um evento adverso', '40. Hospital management seems interested in patient safety only after an adverse event happens')
+ggsave("Apoio de gestão hospitalar para seguraça do paciente2.png", height=11, width=30, units="cm", dpi= 600)
+
+# Trabalho em equipe entre as unidades hospitalares
+(analise_grafica('33. As unidades hospitalares não se coordenam bem entre si.', '33. Hospital units do not coordinate well with each other.') +
+analise_grafica('35. Existe uma boa cooperação entre as unidades hospitalares que precisam trabalhar juntas', '35. There is good cooperation among hospital units that need to work together.') +
+analise_grafica('37. Muitas vezes é desagradável trabalhar unidades com funcionários de outras unidades do hospital', '37. It is often unpleasant to work with staff from other hospital units.')) /
+(analise_grafica('41. As unidades do hospital trabalham bem juntas para prestar o melhor atendimento aos pacientes', '41. Hospital units work well together to provide the best care for patients.') + ggplot() + ggplot())
+ggsave("Trabalho em equipe entre as unidades hospitalares2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Trabalho em equipe no âmbito das unidades
+(analise_grafica('1. As pessoas se apoiam umas às outras nesta unidade', '1. People support one another in this unit.') +
+analise_grafica('3. Quando há muito trabalho a ser feito e rapidamente, trabalhamos juntos em equipe para realizar a tarefa', '3. When a lot of work needs to be done quickly, we work together as a team to get the work done.') +
+analise_grafica('4. Nesta unidade, as pessoas se tratam com respeito', '4. In this unit, people treat each other with respect.')) /
+(analise_grafica('11. Quando uma área nesta unidade fica muito movimentada, as demais ajudam', '11. When one area in this unit gets busy, others help out.') + ggplot() + ggplot())
+ggsave("Trabalho em equipe no âmbito das unidades2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Transferências internas e passagens de plantão
+(analise_grafica('34. Coisas "escapam por entre os dedos” quando os pacientes são transferidos de uma unidade para outra', '34. Things "fall through the cracks" when patients are transferred from one unit to another.') +
+analise_grafica('36. Importantes informações sobre a assistência se perdem durante as mudanças de turno', '36. Important information about care gets lost during shift changes.') +
+analise_grafica('38. Os problemas com frequência ocorrem na troca de informações entre as unidades do hospital', '38. Problems often occur in the exchange of information across hospital units.')) /
+  (analise_grafica('42. As mudanças de turno são problemáticas para os pacientes deste Hospital', '42. Shift changes are problematic for patients in this Hospital.') + ggplot() + ggplot())
+ggsave("Transferências internas e passagens de plantão2.png", height=22, width=30, units="cm", dpi= 600)
+
+# Aprendizado organizacional - melhoria contínua
+analise_grafica('6. Estamos ativamente buscando melhorias para a segurança do paciente', '6. We are actively working to improve patient safety.') +
+analise_grafica('9. Erros que ocorreram levaram a mudanças positivas nesta unidade', '9. Mistakes have led to positive changes in this unit.') +
+analise_grafica('13. Quando fazemos mudanças para melhorar a segurança do paciente, nós avaliamos sua efetividade', '13. When we make changes to improve patient safety, we evaluate their effectiveness.')
+ggsave("Aprendizado organizacional - melhoria contínua2.png", height=11, width=30, units="cm", dpi= 600)
+
+#Expectativas de promoção da segurança dos supervisores e gerentes
+(analise_grafica('19. Meu supervisor/gerente elogia quando vê um trabalho feito de acordo com os procedimentos estabelecidos para a segurança do paciente.', '19. My supervisor/manager praises when seeing a job done according to the established procedures for patient safety.') + analise_grafica('20. Meu supervisor/gerente considera seriamente as sugestões dos funcionários para melhorar a segurança do paciente', '20. My supervisor/manager seriously considers employee suggestions to improve patient safety.') + analise_grafica('21. Sempre que a pressão aumenta, meu supervisor/gerente quer que trabalhemos mais rápido, mesmo que isto signifique tomar atalhos', '21. Whenever pressure increases, my supervisor/manager wants us to work faster, even if it means taking shortcuts.')) /
+  (analise_grafica('22. Meu supervisor/gerente ignora problemas recorrentes na segurança do paciente', '22. My supervisor/manager ignores recurring patient safety issues.') + ggplot() + ggplot())
+ggsave("Expectativas de promoção da segurança dos supervisores e gerentes2.png", height=22, width=30, units="cm", dpi= 600)
+
+#Percepção gerais sobre segurança
+(analise_grafica('10. É apenas por acaso que erros mais sérios não acontecem por aqui', '10. It is just by chance that more serious errors do not happen here.') + analise_grafica('15. A segurança do paciente nunca é sacrificada em prol de se trabalhar mais', '15. Patient safety is never sacrificed for the sake of working more.') + analise_grafica('17. Temos problemas com a segurança do paciente nesta unidade', '17. We have problems with patient safety in this unit.')) / 
+  (analise_grafica('18. Nossos procedimentos e sistemas são bons para impedir que os erros aconteçam', '18. Our procedures and systems are good at preventing errors from happening.') + ggplot() + ggplot())
+ggsave("Percepção gerais sobre segurança2.png", height=22, width=30, units="cm", dpi= 600)
+
+#Respostas não punitivas aos erros
+analise_grafica('8. Os funcionários sentem que seus erros são usados contra eles', '8. Staff feel that their mistakes are held against them.') +
+analise_grafica('12. Quando um evento é notificado, sentimos que o foco se concentra no indivíduo, e não no problema', '12. When an event is reported, it feels as if the focus is on the person, not the issue.') +
+analise_grafica('16. Os funcionários se preocupam que seus erros sejam registrados em seu arquivo funcional', '16. Staff worry that their mistakes are kept in their personnel file.')
+ggsave("Respostas não punitivas aos erros2.png", height=11, width=30, units="cm", dpi= 600)
+
+#Staffing
+(analise_grafica('2. Temos pessoas suficientes para lidar com o volume de trabalho', '2. We have enough staff to handle the workload.') +
+analise_grafica('5. Os funcionários desta unidade trabalham mais horas do que o recomendado no atendimento a pacientes', '5. Staff in this unit work longer hours than is best for patient care.') +
+analise_grafica('7. Utilizamos mais funcionários temporários do que o recomendado no atendimento a paciente', '7. We use more temporary staff than is best for patient care.')) /
+  (analise_grafica('14. Trabalhamos “em modo de crise”, tentando fazer coisas demais, rápido demais', '14. We work in "crisis mode", trying to do too much, too quickly.') + ggplot() + ggplot())
+ggsave("Staffing2.png", height=22, width=30, units="cm", dpi= 600)
+```
+
+```{r}
+df_ano <- read_excel("3 - Dados_Score_Ano_vs_Acreditacao.xlsx")
+df = df_ano[c("Ano", "Staffing")]
+df
+#df <- rbind(data.frame(Ano = "max", Staffing = 100), df, df[1, ])
+#radarchart(df_ano)
+
+```
+```{r}
+fd = df[FALSE, ]
+```
+
+```{r}
+df_ano <- read_excel("3 - Dados_Score_Ano_vs_Acreditacao.xlsx")
+df_ano = df_ano %>% filter(acreditacao == 0)
+df_ano$Ano = as.factor(df_ano$Ano)
+
+```
+```{r}
+coluna = "Staffing"
+df = df_ano[c("Ano", coluna)]
+df = df %>% pivot_wider(names_from = Ano, values_from = .data[[coluna]])
+df$Variavel = NA
+df$Variavel = coluna
+fd = df[FALSE, ]
+fd
+```
+
+```{r}
+
+analise_radar = function(coluna, titulo){
+  df = df_ano[c("Ano", coluna)]
+  df = df %>% spread(Ano, .data[[coluna]])
+  df$Variavel = NA
+  df$Variavel = adicionar_quebra_de_linha(titulo)
+  df = df[, c(ncol(df), 1:(ncol(df)-1))]
+  df
+}
+
+fd = rbind(fd, analise_radar('Abertura de comunicação', 'Open communication') )
+fd = rbind(fd, analise_radar('Feedback e comunicação sobre erros', 'Feedback and communication about errors') )
+fd = rbind(fd, analise_radar('Frequência de eventos relatados', 'Frequency of reported events'))
+fd = rbind(fd, analise_radar('Apoio de gestão hospitalar para segurança do paciente', 'Hospital management support for patient safety') )
+fd = rbind(fd, analise_radar('Trabalho em equipe entre as unidades hospitalares', 'Teamwork between hospital units') )
+fd = rbind(fd, analise_radar('Trabalho em equipe no âmbito das unidades', 'Teamwork within units'))
+fd = rbind(fd, analise_radar('Transferências internas e passagens de plantão', 'Internal transfers and shift changes') )
+fd = rbind(fd, analise_radar('Aprendizado organizacional - melhoria contínua', 'Organizational learning - continuous improvement') )
+fd = rbind(fd, analise_radar('Expectativas de promoção da segurança dos supervisores e gerentes', 'Expectations for promoting safety by supervisors and managers'))
+fd = rbind(fd, analise_radar('Percepção gerais sobre segurança', 'General perceptions about safety') )
+fd = rbind(fd, analise_radar('Respostas não punitivas aos erros', 'Non-punitive responses to errors') )
+fd = rbind(fd, analise_radar('Staffing', 'Staffing'))
+
+fd
+
+grafico_radar = function(titulo, titulo_arquivo){
+  ggradar(fd, 
+          font.radar = "roboto",
+          grid.max = 100, grid.min = 0,
+          grid.label.size = 8.5,
+          axis.label.size = 8,
+          group.point.size = 5,
+          legend.text.size = 20) + theme_bw() +
+    labs(title = titulo) + 
+    theme(legend.text = element_text(size = 16),
+          plot.title = element_text(size = 24, face = "bold", hjust = 0.5))
+  ggsave(paste0(titulo_arquivo,".png"), height=30, width=30, units="cm", dpi=600)
+}
+
+grafico_radar("Abertura de comunicação","titulo do arquivo")
+
+```
+
+```{r}
+df_teste = df_ano[c('Ano','Abertura de comunicação','Feedback e comunicação sobre erros','Frequência de eventos relatados','Apoio de gestão hospitalar para segurança do paciente','Trabalho em equipe entre as unidades hospitalares','Trabalho em equipe no âmbito das unidades','Transferências internas e passagens de plantão','Aprendizado organizacional - melhoria contínua','Expectativas de promoção da segurança dos supervisores e gerentes','Percepção gerais sobre segurança','Respostas não punitivas aos erros','Staffing')]
+
+names(df_teste) <- sapply(names(df_teste), adicionar_quebra_de_linha2)
+
+ggradar(df_teste, 
+        font.radar = "roboto",
+        grid.max = 100, grid.min = 0,
+        grid.label.size = 8.5,
+        axis.label.size = 4,
+        group.point.size = 5,
+        legend.text.size = 20) + theme_bw() +
+  labs(title = "Main Dimensions") + 
+  theme(legend.text = element_text(size = 16),
+        plot.title = element_text(size = 24, face = "bold", hjust = 0.5),
+        plot.margin = margin(2, 2, 2, 2))
+ggsave("Grafico_radar.png", height=30, width=30, units="cm", dpi=600)
+
+ggsave("Agrupamentos2.png", height=30, width=30, units="cm", dpi=600)
+```
+
+
+```{r}
+#df_ano["Ano"] = as.factor(df_ano["Ano"])
+fd = df_ano["Ano"]
+fd$Ano = as.factor(fd$Ano)
+
+analise_radar = function(coluna, titulo){
+  df_temp = df_ano %>% select(coluna) / 100
+  df_temp = df_temp %>% rename_with(~ adicionar_quebra_de_linha2(titulo), .cols = all_of(coluna))
+  return(df_temp)
+}
+
+grafico_radar = function(titulo, titulo_arquivo){
+  ggradar(fd, 
+          values.radar = c("50%","75%","100%"),
+          font.radar = "roboto",
+          grid.max = 1, grid.min = 0,
+          grid.label.size = 8.5,
+          axis.label.size = 4.8,
+          group.point.size = 7,
+          group.line.width = 1,
+          legend.text.size = 20) + 
+    theme_bw() +
+    labs(title = titulo_arquivo) + 
+    theme(legend.text = element_text(size = 16),
+          legend.position = "bottom",
+          plot.title = element_text(size = 24, face = "bold", hjust = 0.5),
+          plot.margin = margin(2, 2, 2, 2))
+  ggsave(paste0(titulo,".png"), height=30, width=35, units="cm", dpi=600)
+}
+
+fd = cbind(fd, analise_radar('Abertura de comunicação', 'Open communication') )
+fd = cbind(fd, analise_radar('Feedback e comunicação sobre erros', 'Feedback and communication about errors') )
+fd = cbind(fd, analise_radar('Frequência de eventos relatados', 'Frequency of reported events'))
+fd = cbind(fd, analise_radar('Apoio de gestão hospitalar para segurança do paciente', 'Hospital management support for patient safety') )
+fd = cbind(fd, analise_radar('Trabalho em equipe entre as unidades hospitalares', 'Teamwork between hospital units') )
+fd = cbind(fd, analise_radar('Trabalho em equipe no âmbito das unidades', 'Teamwork within units'))
+fd = cbind(fd, analise_radar('Transferências internas e passagens de plantão', 'Internal transfers and shift changes') )
+fd = cbind(fd, analise_radar('Aprendizado organizacional - melhoria contínua', 'Organizational learning - continuous improvement') )
+fd = cbind(fd, analise_radar('Expectativas de promoção da segurança dos supervisores e gerentes', 'Expectations for promoting safety by supervisors and managers'))
+fd = cbind(fd, analise_radar('Percepção gerais sobre segurança', 'General perceptions about safety') )
+fd = cbind(fd, analise_radar('Respostas não punitivas aos erros', 'Non-punitive responses to errors') )
+fd = cbind(fd, analise_radar('Staffing', 'Staffing'))
+
+grafico_radar("Abertura de comunicação","titulo do arquivo")
+```
+
+```{r}
+fd = df_ano["Ano"]
+
+#Agrupamento principal
+fd = cbind(fd, analise_radar('Abertura de comunicação', 'Open communication') )
+fd = cbind(fd, analise_radar('Feedback e comunicação sobre erros', 'Feedback and communication about errors') )
+fd = cbind(fd, analise_radar('Frequência de eventos relatados', 'Frequency of reported events'))
+fd = cbind(fd, analise_radar('Apoio de gestão hospitalar para segurança do paciente', 'Hospital management support for patient safety') )
+fd = cbind(fd, analise_radar('Trabalho em equipe entre as unidades hospitalares', 'Teamwork between hospital units') )
+fd = cbind(fd, analise_radar('Trabalho em equipe no âmbito das unidades', 'Teamwork within units'))
+fd = cbind(fd, analise_radar('Transferências internas e passagens de plantão', 'Internal transfers and shift changes') )
+fd = cbind(fd, analise_radar('Aprendizado organizacional - melhoria contínua', 'Organizational learning - continuous improvement') )
+fd = cbind(fd, analise_radar('Expectativas de promoção da segurança dos supervisores e gerentes', 'Expectations for promoting safety by supervisors and managers'))
+fd = cbind(fd, analise_radar('Percepção gerais sobre segurança', 'General perceptions about safety') )
+fd = cbind(fd, analise_radar('Respostas não punitivas aos erros', 'Non-punitive responses to errors') )
+fd = cbind(fd, analise_radar('Staffing', 'Staffing'))
+grafico_radar("Agrupamentos","Groupings")
+
+fd = df_ano["Ano"]
+
+# Abertura de comunicação
+fd = cbind(fd, analise_radar('24. Os funcionários falam voluntariamente se vêem algo que possa afetar negativamente o atendimento aos pacientes', '24. Employees voluntarily speak up if they see something that may negatively affect patient care') )
+fd = cbind(fd, analise_radar('26. Os funcionários sentem-se à vontade para questionar decisões ou ações dos que têm mais autoridade', '26. Staff feel free to question the decisions or actions of those with more authority') )
+fd = cbind(fd, analise_radar('28. Os funcionários têm receio de perguntar quando algo não parece certo', '28. Staff are afraid to ask when something does not look right'))
+grafico_radar("Abertura de comunicação","Opening of communication")
+
+fd = df_ano["Ano"]
+
+# Feedback e comunicação sobre erros
+fd = cbind(fd, analise_radar('23. Recebemos feedback das mudanças implementadas com base nos eventos notificados', '23. We are given feedback about changes put into place based on event reports') )
+fd = cbind(fd, analise_radar('25. Somos informados sobre os erros que acontecem nesta unidade', '25. We are informed about errors that happen in this unit') )
+fd = cbind(fd, analise_radar('27. Nesta unidade, discutimos maneiras de impedir que os erros tornem a acontecer', '27. In this unit, we discuss ways to prevent errors from happening again'))
+grafico_radar("Feedback e comunicação sobre erros","Feedback and communication about errors")
+
+fd = df_ano["Ano"]
+
+# Frequência de eventos relatados
+fd = cbind(fd, analise_radar('29. Quando acontece um erro, mas ele é identificado e corrigido antes de afetar o paciente, com que frequência é notificado?', '29. When a mistake is made, but is caught and corrected before affecting the patient, how often is this reported?') )
+fd = cbind(fd, analise_radar('30. Quando acontece um erro, mas que não tem potencial de dano ao paciente, com que frequência é notificado?', '30. When a mistake is made, but has no potential to harm the patient, how often is this reported?') )
+fd = cbind(fd, analise_radar('31. Quando acontece um erro que poderia prejudicar o paciente, mas isto não ocorreu, com que frequência é notificado?', '31. When a mistake is made that could harm the patient, but does not, how often is this reported?'))
+grafico_radar("Frequencia de eventos relatados","Frequency of reported events")
+
+fd = df_ano["Ano"]
+
+# Apoio de gestão hospitalar para segurança do paciente
+fd = cbind(fd, analise_radar('32. A administração do hospital cria um ambiente de trabalho que promove a segurança do paciente', '32. Hospital management supports my daily efforts to keep patients safe') )
+fd = cbind(fd, analise_radar('39. As ações da administração do hospital mostram que a segurança do paciente é uma prioridade máxima', '39. Hospital management is doing a good job of keeping patient safety a top priority') )
+fd = cbind(fd, analise_radar('40. A administração do hospital parece se interessar pela segurança do paciente apenas quando acontece um evento adverso', '40. Hospital management seems interested in patient safety only after an adverse event happens'))
+grafico_radar("Apoio de gestão hospitalar para seguraça do paciente","Hospital management support for patient safety")
+
+fd = df_ano["Ano"]
+
+# Trabalho em equipe entre as unidades hospitalares
+fd = cbind(fd, analise_radar('33. As unidades hospitalares não se coordenam bem entre si.', '33. Hospital units do not coordinate well with each other.') )
+fd = cbind(fd, analise_radar('35. Existe uma boa cooperação entre as unidades hospitalares que precisam trabalhar juntas', '35. There is good cooperation among hospital units that need to work together.') )
+fd = cbind(fd, analise_radar('37. Muitas vezes é desagradável trabalhar unidades com funcionários de outras unidades do hospital', '37. It is often unpleasant to work with staff from other hospital units.'))
+fd = cbind(fd, analise_radar('41. As unidades do hospital trabalham bem juntas para prestar o melhor atendimento aos pacientes', '41. Hospital units work well together to provide the best care for patients.') )
+grafico_radar("Trabalho em equipe entre as unidades hospitalares","Teamwork between hospital units")
+
+fd = df_ano["Ano"]
+
+# Trabalho em equipe no âmbito das unidades
+fd = cbind(fd, analise_radar('1. As pessoas se apoiam umas às outras nesta unidade', '1. People support one another in this unit.') )
+fd = cbind(fd, analise_radar('3. Quando há muito trabalho a ser feito e rapidamente, trabalhamos juntos em equipe para realizar a tarefa', '3. When a lot of work needs to be done quickly, we work together as a team to get the work done.') )
+fd = cbind(fd, analise_radar('4. Nesta unidade, as pessoas se tratam com respeito', '4. In this unit, people treat each other with respect.'))
+fd = cbind(fd, analise_radar('11. Quando uma área nesta unidade fica muito movimentada, as demais ajudam', '11. When one area in this unit gets busy, others help out.') )
+grafico_radar("Trabalho em equipe no âmbito das unidades","Teamwork within units")
+
+fd = df_ano["Ano"]
+
+# Transferências internas e passagens de plantão
+fd = cbind(fd, analise_radar('34. Coisas "escapam por entre os dedos” quando os pacientes são transferidos de uma unidade para outra', '34. Things "fall through the cracks" when patients are transferred from one unit to another.') )
+fd = cbind(fd, analise_radar('36. Importantes informações sobre a assistência se perdem durante as mudanças de turno', '36. Important information about care gets lost during shift changes.') )
+fd = cbind(fd, analise_radar('38. Os problemas com frequência ocorrem na troca de informações entre as unidades do hospital', '38. Problems often occur in the exchange of information across hospital units.'))
+fd = cbind(fd, analise_radar('42. As mudanças de turno são problemáticas para os pacientes deste Hospital', '42. Shift changes are problematic for patients in this Hospital.') )
+grafico_radar("Transferências internas e passagens de plantão","Internal transfers and shift changes")
+
+fd = df_ano["Ano"]
+
+# Aprendizado organizacional - melhoria contínua
+fd = cbind(fd, analise_radar('6. Estamos ativamente buscando melhorias para a segurança do paciente', '6. We are actively working to improve patient safety.') )
+fd = cbind(fd, analise_radar('9. Erros que ocorreram levaram a mudanças positivas nesta unidade', '9. Mistakes have led to positive changes in this unit.') )
+fd = cbind(fd, analise_radar('13. Quando fazemos mudanças para melhorar a segurança do paciente, nós avaliamos sua efetividade', '13. When we make changes to improve patient safety, we evaluate their effectiveness.'))
+grafico_radar("Aprendizado organizacional - melhoria contínua","Organizational learning - continuous improvement")
+
+fd = df_ano["Ano"]
+
+#Expectativas de promoção da segurança dos supervisores e gerentes
+fd = cbind(fd, analise_radar('19. Meu supervisor/gerente elogia quando vê um trabalho feito de acordo com os procedimentos estabelecidos para a segurança do paciente.', '19. My supervisomanager praises when seeing a job done according to the established procedures for patient safety.') )
+fd = cbind(fd, analise_radar('20. Meu supervisor/gerente considera seriamente as sugestões dos funcionários para melhorar a segurança do paciente', '20. My supervisomanager seriously considers employee suggestions to improve patient safety.') )
+fd = cbind(fd, analise_radar('21. Sempre que a pressão aumenta, meu supervisor/gerente quer que trabalhemos mais rápido, mesmo que isto signifique tomar atalhos', '21. Whenever pressure increases, my supervisomanager wants us to work faster, even if it means taking shortcuts.'))
+fd = cbind(fd, analise_radar('22. Meu supervisor/gerente ignora problemas recorrentes na segurança do paciente', '22. My supervisomanager ignores recurring patient safety issues.') )
+grafico_radar("Expectativas de promoção da segurança dos supervisores e gerentes","Safety promotion expectations of supervisors and managers")
+
+fd = df_ano["Ano"]
+
+#Percepção gerais sobre segurança
+fd = cbind(fd, analise_radar('10. É apenas por acaso que erros mais sérios não acontecem por aqui', '10. It is just by chance that more serious errors do not happen here.') )
+fd = cbind(fd, analise_radar('15. A segurança do paciente nunca é sacrificada em prol de se trabalhar mais', '15. Patient safety is never sacrificed for the sake of working more.') )
+fd = cbind(fd, analise_radar('17. Temos problemas com a segurança do paciente nesta unidade', '17. We have problems with patient safety in this unit.') )
+fd = cbind(fd, analise_radar('18. Nossos procedimentos e sistemas são bons para impedir que os erros aconteçam', '18. Our procedures and systems are good at preventing errors from happening.') )
+grafico_radar("Percepção gerais sobre segurança","General perception about security")
+
+fd = df_ano["Ano"]
+
+#Respostas não punitivas aos erros
+fd = cbind(fd, analise_radar('8. Os funcionários sentem que seus erros são usados contra eles', '8. Staff feel that their mistakes are held against them.') )
+fd = cbind(fd, analise_radar('12. Quando um evento é notificado, sentimos que o foco se concentra no indivíduo, e não no problema', '12. When an event is reported, it feels as if the focus is on the person, not the issue.') )
+fd = cbind(fd, analise_radar('16. Os funcionários se preocupam que seus erros sejam registrados em seu arquivo funcional', '16. Staff worry that their mistakes are kept in their personnel file.'))
+grafico_radar("Respostas não punitivas aos erros","Non-punitive responses to errors")
+
+fd = df_ano["Ano"]
+
+#Staffing
+fd = cbind(fd, analise_radar('2. Temos pessoas suficientes para lidar com o volume de trabalho', '2. We have enough staff to handle the workload.') )
+fd = cbind(fd, analise_radar('5. Os funcionários desta unidade trabalham mais horas do que o recomendado no atendimento a pacientes', '5. Staff in this unit work longer hours than is best for patient care.') )
+fd = cbind(fd, analise_radar('7. Utilizamos mais funcionários temporários do que o recomendado no atendimento a paciente', '7. We use more temporary staff than is best for patient care.'))
+fd = cbind(fd, analise_radar('14. Trabalhamos “em modo de crise”, tentando fazer coisas demais, rápido demais', '14. We work in "crisis mode", trying to do too much, too quickly.') )
+grafico_radar("Staffing","Staffing")
+
+```
+
+

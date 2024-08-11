@@ -1,0 +1,424 @@
+```{r}
+pasta = 'C:/Users/gabri/OneDrive/Documentos/Anestesia - CMA/Cultura de Segurança/2 - Tabelas com Escores Anuais/'
+arquivo = '2 - Dados_Score_Ano_Acreditacao_Unidade.xlsx'
+caminho =  file.path(pasta, arquivo)
+df_backup = read_excel(caminho)
+df = df_backup
+df
+
+```
+
+```{r Arrumando Tipos}
+
+df$Ano = df$Ano %>% as.factor()
+
+for (coluna in names(df)){
+  classe = df[[coluna]] %>% class()
+  qtd_levels = df[[coluna]] %>% as.factor() %>% levels() %>% length()
+  
+  if (qtd_levels == 2){
+    df[[coluna]] = df[[coluna]] %>% as.factor()
+  }
+}
+
+```
+
+
+```{r}
+names(df)
+```
+
+
+```{r LISTA DAS COLUNAS}
+# Função para remover caracteres especiais
+remove_special_chars <- function(column_names) {
+  gsub("[^[:alnum:]_]", "_", column_names)
+}
+
+# Aplicar a função aos nomes das colunas
+names(df) <- remove_special_chars(names(df))
+
+names(df) <- gsub("^([0-9])", "coluna\\1", names(df))
+#names(df) <- gsub("__", "_ ", names(df))
+
+#names(df) <- gsub(":", " ", names(df))
+
+names(df)
+
+```
+
+
+```{r}
+
+df$coluna4__Nesta_unidade__as_pessoas_se_tratam_com_respeito
+
+# Selecionar apenas colunas numéricas
+df_num <- df[sapply(df, is.numeric)]
+
+# Calcular a matriz de correlação
+matriz_correlacao = cor(df_num, use = "complete.obs") 
+matriz_correlacao = matriz_correlacao %>% as.data.frame()
+matriz_correlacao %>% round(2) %>% capture(pontuacao = ',')
+
+#row.names(matriz_correlacao) = paste0('C', 1:nrow(matriz_correlacao))
+
+```
+
+```{r}
+df_num = df[sapply(df, is.numeric)]
+
+variavel_dependente = 'SEÇÃO_G2__Notificou_algum_evento_nos_ultimos_12_meses'
+
+colunas = names(df_num)
+variaveis_independentes = colunas[!colunas %in% c(coluna_y)]
+variaveis_independentes = variaveis_independentes[c(3:length(variaveis_independentes))]
+variaveis_independentes
+```
+
+
+
+```{r Grafico de Correlação}
+#coluna_x = 'coluna1__As_pessoas_se_apoiam_umas_às_outras_nesta_unidade'
+coluna_y = 'SEÇÃO_G2__Notificou_algum_evento_nos_ultimos_12_meses'
+
+for ( coluna_x in variaveis_independentes){
+
+  ####################################################
+  
+  teste = cor.test(x=df[[coluna_x]], y=df[[coluna_y]], method = 'pearson')
+  cor_pearson = teste$estimate %>% rround(digitos = 2)
+  cor_pearsonP = teste$p.value %>% retorne_p()
+  
+  titulo = paste0('Cor Pearson = ', cor_pearson, ' (p-value = ', cor_pearsonP, ')', ' | ')
+  
+  ####################################################
+  
+  teste = cor.test(df[[coluna_x]], df[[coluna_y]], method = 'spearman')
+  cor_spearman = teste$estimate %>% rround(digitos = 2)
+  cor_spearmanP = teste$p.value %>% retorne_p()
+  
+  titulo = paste0(titulo, 'Cor Spearman = ', cor_spearman, ' (p-value = ', cor_spearmanP, ')', '\n')
+  
+  ####################################################
+  
+  #Regressão Linear
+  modelo = lm(df[[coluna_y]]~df[[coluna_x]])
+  summary_LM <- modelo %>% summary()
+  p_value <- summary_LM$coefficients["df[[coluna_x]]", "Pr(>|t|)"] %>% retorne_p()
+  
+  # R-quadrado (R²)
+  r_squared <- summary_LM$r.squared %>% rround(2)
+  
+  # R-quadrado ajustado
+  r_squared_adj <- summary_LM$adj.r.squared %>% rround(2)
+  
+  titulo = paste0(titulo, 'Regressão Linear: R² = ', r_squared, ' | R² Ajustado = ', r_squared_adj, ' (p-value = ', p_value, ')\n')
+  
+  ####################################################
+  
+  # Previsões do modelo
+  predictions = predict(modelo)
+  
+  # MAE - Mean Absolute Error
+  MAE = mean(abs(df[[coluna_y]] - predictions)) %>% round(2)
+  
+  # MSE - Mean Squared Error
+  MSE = mean((df[[coluna_y]] - predictions)^2) %>% round(2)
+  
+  # RMSE - Root Mean Squared Error
+  RMSE = sqrt(MSE) %>% round(2)
+  
+  # MAPE - Mean Absolute Percentage Error
+  MAPE = mean(abs((df[[coluna_y]] - predictions) / df[[coluna_y]])) * 100 %>% round(2)
+  MAPE = MAPE %>% round(2)
+  
+  titulo = paste0(titulo, paste("MAE =", MAE, "| MSE =", MSE, "| RMSE =", RMSE, "| MAPE =", MAPE, '\n'))
+  
+  # AIC
+  aic = AIC(modelo) %>% round(2)
+  # BIC
+  bic = BIC(modelo) %>% round(2)
+  
+  titulo = paste0(titulo, paste('AIC =', aic, '| BIC=', bic))
+  
+  ####################################################
+  
+  p = ggplot(df, aes(x = !!sym(coluna_x), y = !!sym(coluna_y) )) + 
+    geom_point(alpha=0.5, size=2.5) + geom_smooth(method = 'lm') + 
+    labs(title = titulo, y = 'Proporção de pessoas que notificacão') +
+    theme_classic()
+  
+  p %>% print()
+}
+
+```
+
+
+```{r Realizando busca em grade e determinando melhor modelo}
+
+library(car)
+
+lista_erros = c()
+
+# Função para ajustar o modelo e calcular as métricas
+calcular_metricas = function(vars) {
+  vars = sort(vars)
+  formula_str = paste(vars, collapse = "+")
+  formula_str = paste(variavel_dependente, "~", formula_str)
+  formula = as.formula(formula_str)
+  #print(formula)
+  
+  tryCatch({
+    ################################################################################
+    modelo = lm(formula, data = df)
+    
+    # Previsões do modelo
+    predictions = predict(modelo)
+    
+    # MAE - Mean Absolute Error
+    MAE = mean(abs(df[[coluna_y]] - predictions)) %>% round(2)
+    
+    # MSE - Mean Squared Error
+    MSE = mean((df[[coluna_y]] - predictions)^2) %>% round(2)
+    
+    # RMSE - Root Mean Squared Error
+    RMSE = sqrt(MSE) %>% round(2)
+    
+    # MAPE - Mean Absolute Percentage Error
+    MAPE = mean(abs((df[[coluna_y]] - predictions) / df[[coluna_y]])) * 100 %>% round(2)
+    MAPE = MAPE %>% round(2)
+    
+    # Summary do modelo
+    summary_LM = modelo %>% summary()
+    
+    # R-quadrado (R²)
+    r_squared <- summary_LM$r.squared %>% round(2)
+    
+    # R-quadrado ajustado
+    r_squared_adj <- summary_LM$adj.r.squared %>% round(2)
+    
+    # AIC
+    aic = AIC(modelo)
+    # BIC
+    bic = BIC(modelo)
+    
+    ### Multicolinearidade: VIF > 10
+    if (length(vars) > 1){
+      VIF = any(vif(modelo) > 10)
+    } else{ 
+      VIF = FALSE
+    }
+    
+    
+    return(c(r_squared, r_squared_adj, MAE, MSE, RMSE, MAPE, aic, bic, VIF))
+    }, error = function(e) {
+      
+      print(paste0('erro com o modelo: ', formula_str))
+      lista_erros = append(lista_erros, formula_str)
+    
+      return(c(NA, NA, NA, NA, NA, NA, NA, NA, NA))
+  })
+}
+
+# Função que gera matriz da busca em grade
+busca_em_grade = function(variavel_dependente, variaveis_independentes){
+  variaveis_independentes = sort(variaveis_independentes)
+  # Gerando todas as combinações de variáveis independentes
+  combinacoes = lapply(1:length(variaveis_independentes), function(x) combn(variaveis_independentes, x, simplify = FALSE))
+  combinacoes = unlist( combinacoes, recursive = FALSE)
+  
+  # Ajustar modelos para cada combinação e armazenar os resultados
+  resultados = data.frame(Combinacao = character(),
+                          r_squared = numeric(), r_squared_adj = numeric(), 
+                          MAE = numeric(), MSE = numeric(), RMSE = numeric(), MAPE = numeric(),
+                          AIC = numeric(), BIC = numeric(), vif = numeric(),
+                          stringsAsFactors = FALSE)
+  
+  for (comb in combinacoes) {
+    existencia = any(tabelona$Combinacao %in% paste(comb, collapse = "+"))
+    
+    if (existencia == F){
+      metricas = calcular_metricas(comb)
+      resultados = rbind(resultados, data.frame(Combinacao = paste(comb, collapse = "+"),
+                                                r_squared = metricas[1], r_squared_adj = metricas[2], 
+                                                MAE = metricas[3], MSE = metricas[4], RMSE = metricas[5], MAPE = metricas[6],
+                                                AIC = metricas[7], BIC = metricas[8], vif = metricas[9],
+                                                stringsAsFactors = FALSE))
+    }
+  }
+  
+  resultados = resultados %>% mutate_if(is.numeric, round, digits = 2)
+  
+  return(resultados)
+}
+
+##############################################################################################################################
+################################################### CRIAÇÃO
+
+tabelona_backup = data.frame(Combinacao = as.numeric(),
+                             r_squared = as.numeric(), r_squared_adj = as.numeric(), 
+                             MAE = as.numeric(), MSE = as.numeric(), RMSE = as.numeric(), MAPE = as.numeric(),
+                             vif = as.numeric())
+
+tabelona = tabelona_backup
+
+tabelinha = busca_em_grade(variavel_dependente, variaveis_independentes)
+tabelona = rbind(tabelona, tabelinha)
+tabelona
+
+```
+
+```{r}
+tabelona = arrange(tabelona, AIC, BIC, desc(r_squared), desc(r_squared_adj))
+row.names(tabelona) = 1:nrow(tabelona)
+tabelona
+
+```
+
+```{r}
+
+fore_plot = function(vars){
+  #vars = sort(tabelona$Combinacao[100])
+  formula_str = paste(vars, collapse = "+")
+  formula_str = paste(variavel_dependente, "~", formula_str)
+  formula = as.formula(formula_str)
+  
+  modelo_analisado = lm(formula, data = df)
+  
+  summary_lm = modelo_analisado %>% summary()
+  summary_lm = summary_lm$coefficients
+  
+  ic = confint(modelo_analisado, method = "Wald")
+  #ic <- ic[-c(1), ]
+  
+  estimadores = cbind(summary_lm, ic)[-1,] %>% as.data.frame()
+  estimadores[["Variable"]] = rownames(estimadores)
+  
+  names(estimadores)[names(estimadores) == "Pr(>|t|)"] = "p_value"
+  names(estimadores)[names(estimadores) == "2.5 %"] = "IC_0"
+  names(estimadores)[names(estimadores) == "97.5 %"] = "IC_1"
+  estimadores = apply_retorne_p(estimadores, 'p_value')
+  estimadores$estimador = NA
+  for (i in 1:nrow(estimadores)){ 
+    estimadores$estimador[i] = paste0( rround(estimadores$Estimate[i],2), 
+                                       ' (', rround(estimadores$IC_0[i],2), 
+                                       ' to ', 
+                                       rround(estimadores$IC_1[i],2), ')')
+    estimadores$Variable[i] = adicionar_quebra_de_linha(estimadores$Variable[i], 20)
+  }
+  rownames(estimadores) = 1:nrow(estimadores)
+  
+  #estimadores
+  
+  plot1 = ggplot(estimadores, aes(y = Variable, x = Estimate)) + #
+    geom_point(shape = 18, size = 5, position = position_dodge(width = 0.5)) +  
+    geom_errorbarh(aes(xmin = IC_0, xmax = IC_1), height = 0.25, position = position_dodge(width = 0.5)) +
+    geom_vline(xintercept = 0, color = "tomato", linetype = "dashed", cex = 1, alpha = 0.5) +
+    labs(title=' ', x="Estimators of Linear Model (95% CI)", y='PEEP') +
+    theme_bw() +
+    theme(legend.position = 'none',
+          plot.title = element_text(hjust = 0.5, size=12),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black"),
+          axis.text.y = element_text(size = 12, colour = "black"),
+          axis.text.x.bottom = element_text(size = 12, colour = "black"),
+          axis.title.x = element_text(size = 12, colour = "black")) +
+    theme_bw() + guides(color = FALSE)
+    #scale_x_continuous(trans='log10') #+ geom_text(aes(label = pvalor))
+  
+  table_base = ggplot(estimadores, aes(y=Variable)) +
+    labs(y=NULL) + 
+    theme_bw() +
+    theme(legend.position = 'none',
+          plot.title = element_text(hjust = 0.5, size=12), 
+          axis.text.x = element_text(color="white", hjust = -3, size = 25), ## This is used to help with alignment
+          axis.line = element_blank(),
+          axis.text.y = element_blank(), 
+          axis.ticks = element_blank(),
+          axis.title.y = element_blank(), 
+          panel.background = element_blank(), 
+          panel.border = element_blank(), 
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          plot.background = element_blank())
+  
+  tab1 = table_base +
+    geom_text(aes(x = 1, label = p_value, fontface = "bold"), size = 4, position = position_dodge(width = 0.5)) + #, color = momento
+    labs(title="P-valor", x=NULL)
+  
+  tab2 = table_base + 
+    labs(title = "space") +
+    geom_text(aes(x = 1, label = estimador, fontface = "bold"), size = 4, position = position_dodge(width = 0.5)) + #, color = momento
+    labs(title="Estimator", x=NULL)
+  
+  #lay =  matrix(c(1,1,1,1,1,1,1,1,1,2,3,3), nrow = 1)
+  #grid = grid.arrange(plot1, tab1, tab2, layout_matrix = lay)
+  #grid
+  return(plot1)
+}
+
+for (i in 1:10){
+  var = tabelona$Combinacao[i]
+  fore_plot(var) %>% print()
+}
+
+
+```
+
+
+
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
